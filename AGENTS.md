@@ -53,10 +53,11 @@ It means the user wants those playbook rules to apply to **every session, not ju
 | Agent | Global Config File |
 |-------|-------------------|
 | Claude Code | `~/.claude/CLAUDE.md` |
-| Cursor | `~/.cursorrules` |
-| Windsurf | `~/.windsurf/rules` |
-| GitHub Copilot | `.github/copilot-instructions.md` |
-| Codex / OpenAI | `~/.codex/CLAUDE.md` or `~/.opencode/CLAUDE.md` |
+| Gemini CLI | `~/.gemini/GEMINI.md` |
+| Codex CLI | `AGENTS.md` (project-level, no true global) |
+| Cursor | `.cursorrules` or `.cursor/rules/` (project-level, no true global) |
+| Windsurf | `.windsurfrules` or `.windsurf/rules/` (project-level, no true global) |
+| GitHub Copilot | `.github/copilot-instructions.md` (project-level, no true global) |
 
 **What to do:**
 1. Read the playbook(s) the user mentioned
@@ -64,3 +65,7 @@ It means the user wants those playbook rules to apply to **every session, not ju
 3. Write them into the appropriate global config file in a clearly labeled section like `<!-- Agent Playbooks — Global Rules -->`
 4. If the file already exists, append or merge — don't overwrite existing content
 5. Confirm to the user which rules were saved and to which file
+
+**Fallback:** If the agent doesn't have a defined global config file name, assume it reads `AGENTS.md` from its own root directory (e.g., `~/.augment/AGENTS.md`, `~/.opencode/AGENTS.md`).
+
+**Skill-based agents:** If the agent uses a skills directory for global rules (e.g., `~/.commandcode/skills/`), copy the entire playbook content into a file named after the playbook (e.g., `~/.commandcode/skills/security-audit/SKILL.md`, `~/.commandcode/skills/git-workflow/SKILL.md`). This preserves the playbook as a reusable skill rather than flattening rules into a single config file.
