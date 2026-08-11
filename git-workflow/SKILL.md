@@ -17,6 +17,13 @@ The user will say things like:
 - After committing, **stop and ask** before pushing
 - Never push without explicit user instruction
 
+### Agent-Generated Directories
+- Always add agent-generated directories to `.gitignore` before they get accidentally tracked:
+  - `.commandcode/`, `.claude/`, `.cursor/`, `.codex/`, `.copilot/`, `.windsurf/`
+  - `.augment/`, `.continue/`, `.aider/`, `.gemini/`, `.opencode/`
+- Check for these before staging — if found untracked, add them to `.gitignore` first
+- These are per-project agent workspace dirs, not intended for version control
+
 ### Conventional Commits
 All commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/):
 
@@ -59,6 +66,7 @@ Before every push, verify:
    - Environment: `.env` (track `.env.example` instead)
    - OS/IDE: `.DS_Store`, `thumbs.db`, `.vscode/`, `.idea/`
    - Logs: `*.log`, `*.cache`, `*.tmp`
+   - Agent dirs: `.commandcode/`, `.claude/`, `.cursor/`, `.codex/`, `.copilot/`, `.windsurf/`, `.augment/`, `.continue/`, `.aider/`, `.gemini/`, `.opencode/`
    - Project-specific output/generated directories
 3. **Secrets check** — scan `git diff` for API keys, tokens, passwords, PII
 4. **Confirm** — ask user "Ready to push?" before executing

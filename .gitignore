@@ -3,3 +3,16 @@ thumbs.db
 *.log
 *.cache
 *.tmp
+
+# Agent-generated directories
+.commandcode/
+.claude/
+.cursor/
+.codex/
+.copilot/
+.windsurf/
+.augment/
+.continue/
+.aider/
+.gemini/
+.opencode/
