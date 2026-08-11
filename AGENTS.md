@@ -39,3 +39,28 @@ agent-playbooks/
 - Do NOT skip steps or improvise unless the user asks
 - **Commit rules:** Never add `Co-authored-by` or agent attribution trailers. Commits are the user's work.
 - **Never auto-commit or auto-push.** Stage, show diff, wait for user instruction.
+
+### Saving Playbook Rules Globally
+
+When the user says something like:
+- "Read the git-workflow and security-audit playbooks, then save on your core memory"
+- "Apply these playbook rules globally"
+
+It means the user wants those playbook rules to apply to **every session, not just this one**. Extract the rules from the playbook(s) and save them to the agent's global/core configuration file so they persist across all future sessions.
+
+**Per-agent config file locations:**
+
+| Agent | Global Config File |
+|-------|-------------------|
+| Claude Code | `~/.claude/CLAUDE.md` |
+| Cursor | `~/.cursorrules` |
+| Windsurf | `~/.windsurf/rules` |
+| GitHub Copilot | `.github/copilot-instructions.md` |
+| Codex / OpenAI | `~/.codex/CLAUDE.md` or `~/.opencode/CLAUDE.md` |
+
+**What to do:**
+1. Read the playbook(s) the user mentioned
+2. Extract the persistent rules (e.g., commit conventions, pre-push audit, secrets check) — not the step-by-step workflows, but the standing rules that should always apply
+3. Write them into the appropriate global config file in a clearly labeled section like `<!-- Agent Playbooks — Global Rules -->`
+4. If the file already exists, append or merge — don't overwrite existing content
+5. Confirm to the user which rules were saved and to which file
