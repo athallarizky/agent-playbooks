@@ -26,6 +26,11 @@ agent-playbooks/
     SKILL.md        ← playbook: secrets, PII, and security checks
   git-workflow/
     SKILL.md        ← playbook: conventional commits, pre-push audit
+  linkedin-writing/
+    SKILL.md        ← playbook: LinkedIn post writing style + voice
+    samples/        ← seed material for AI calibration
+  sprint-driven-development/
+    SKILL.md        ← playbook: structured sprint workflow with delegation
 ```
 
 ## Rules
