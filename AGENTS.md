@@ -31,6 +31,8 @@ agent-playbooks/
     samples/        ← seed material for AI calibration
   sprint-driven-development/
     SKILL.md        ← playbook: structured sprint workflow with delegation
+  repo-triage/
+    SKILL.md        ← playbook: fast malware/supply-chain scan of cloned repos
 ```
 
 ## Rules

@@ -4,6 +4,10 @@ thumbs.db
 *.cache
 *.tmp
 
+# IDE
+.vscode/
+.idea/
+
 # Agent-generated directories
 .commandcode/
 .claude/

@@ -11,6 +11,7 @@ agent-playbooks/
   git-workflow/SKILL.md                ← Conventional commits, pre-push audit, no auto-commit
   linkedin-writing/SKILL.md            ← LinkedIn post writing in Athalla's voice + style
   sprint-driven-development/SKILL.md   ← Structured sprint workflow for AI-agent-driven projects
+  repo-triage/SKILL.md                 ← Fast malware/supply-chain scan for newly cloned repos
 ```
 
 ## How It Works
@@ -30,5 +31,6 @@ SKILL.md files act as **briefing documents** for agents. The agent reads the SKI
 | `git-workflow` | Enforce conventional commits, pre-push audit checklist, and no auto-commit/push |
 | `linkedin-writing` | Write LinkedIn posts in Athalla's conversational Indo-English tech storytelling style |
 | `sprint-driven-development` | Structured sprint workflow: discovery → planning → phased execution → retro, with full traceability and LLM delegation support |
+| `repo-triage` | Fast static scan of a newly cloned repo for malware, obfuscation, malicious scripts, network exfiltration, and supply-chain risks |
 
 More coming soon.
