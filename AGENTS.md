@@ -33,6 +33,8 @@ agent-playbooks/
     SKILL.md        ← playbook: structured sprint workflow with delegation
   repo-triage/
     SKILL.md        ← playbook: fast malware/supply-chain scan of cloned repos
+  concept-lab/
+    SKILL.md        ← playbook: learn concepts via small hands-on experiment projects
 ```
 
 ## Rules

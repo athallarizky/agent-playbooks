@@ -12,6 +12,7 @@ agent-playbooks/
   linkedin-writing/SKILL.md            ← LinkedIn post writing in Athalla's voice + style
   sprint-driven-development/SKILL.md   ← Structured sprint workflow for AI-agent-driven projects
   repo-triage/SKILL.md                 ← Fast malware/supply-chain scan for newly cloned repos
+  concept-lab/SKILL.md                 ← Learn engineering concepts via small hands-on experiments
 ```
 
 ## How It Works
@@ -32,5 +33,6 @@ SKILL.md files act as **briefing documents** for agents. The agent reads the SKI
 | `linkedin-writing` | Write LinkedIn posts in Athalla's conversational Indo-English tech storytelling style |
 | `sprint-driven-development` | Structured sprint workflow: discovery → planning → phased execution → retro, with full traceability and LLM delegation support |
 | `repo-triage` | Fast static scan of a newly cloned repo for malware, obfuscation, malicious scripts, network exfiltration, and supply-chain risks |
+| `concept-lab` | Turn engineering concepts into small learning projects — understand → analogy → build → experiment → compare alternatives → break it → reflect |
 
 More coming soon.
