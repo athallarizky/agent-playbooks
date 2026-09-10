@@ -7,6 +7,7 @@
 ```
 agent-playbooks/
   ai-guided-learning/SKILL.md          ← Research-first, phased learning workflow
+  feature-workflow/SKILL.md            ← Universal, stack-agnostic feature development lifecycle
   security-audit/SKILL.md              ← Secrets, PII, and security checks before commit/publish
   git-workflow/SKILL.md                ← Conventional commits, pre-push audit, no auto-commit
   linkedin-writing/SKILL.md            ← LinkedIn post writing in Athalla's voice + style
@@ -28,6 +29,7 @@ SKILL.md files act as **briefing documents** for agents. The agent reads the SKI
 | Playbook | What It Does |
 |----------|-------------|
 | `ai-guided-learning` | Learn a new tech by building a real project — research → architecture → phased build |
+| `feature-workflow` | Universal 7-phase feature development lifecycle for onboarding and building features in any codebase |
 | `security-audit` | Scan repos for secrets, PII, and security issues before committing or open-sourcing |
 | `git-workflow` | Enforce conventional commits, pre-push audit checklist, and no auto-commit/push |
 | `linkedin-writing` | Write LinkedIn posts in Athalla's conversational Indo-English tech storytelling style |

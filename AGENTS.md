@@ -22,6 +22,8 @@ agent-playbooks/
   AGENTS.md         ← this file (agent briefing)
   ai-guided-learning/
     SKILL.md        ← playbook: phased learning workflow
+  feature-workflow/
+    SKILL.md        ← playbook: universal 7-phase feature development lifecycle
   security-audit/
     SKILL.md        ← playbook: secrets, PII, and security checks
   git-workflow/
