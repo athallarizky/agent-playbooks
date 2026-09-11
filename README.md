@@ -14,6 +14,7 @@ agent-playbooks/
   sprint-driven-development/SKILL.md   ← Structured sprint workflow for AI-agent-driven projects
   repo-triage/SKILL.md                 ← Fast malware/supply-chain scan for newly cloned repos
   concept-lab/SKILL.md                 ← Learn engineering concepts via small hands-on experiments
+  handbook-workflow/SKILL.md           ← Centralized docs management, symlink sync, zero-leakage
 ```
 
 ## How It Works

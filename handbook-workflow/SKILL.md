@@ -97,18 +97,35 @@ Add the new project to `<handbook-root>/README.md` under the Projects table, and
 
 ## Automated Helper Script
 
-The handbook includes an automated helper script at `scripts/link-project.sh`:
+This playbook bundles a standalone, universal script at `handbook-workflow/scripts/link-project.sh`.
+
+It automates the entire linking process:
+- Creates the project folder in the handbook if not present
+- Safely moves any pre-existing docs into the handbook
+- Computes and establishes a portable relative symbolic link (`/docs -> ../engineering-handbook/projects/<project>`)
+- Automatically updates the project's `.gitignore` to prevent any documentation leakage
+
+### Usage
 
 ```bash
-# Inside engineering-handbook:
-./scripts/link-project.sh <project-name-or-path>
+# Basic usage (handbook resolved via auto-discovery or $HANDBOOK_DIR):
+./handbook-workflow/scripts/link-project.sh <project-name-or-path>
 
-# Examples (all work interchangeably):
-./scripts/link-project.sh rent-house-ai
-./scripts/link-project.sh ../rent-house-ai
-./scripts/link-project.sh /path/to/any/project
+# Explicit handbook path:
+./handbook-workflow/scripts/link-project.sh <project-name-or-path> <handbook-path>
+
+# Examples:
+./handbook-workflow/scripts/link-project.sh ../project-a
+./handbook-workflow/scripts/link-project.sh project-b ../engineering-handbook
+HANDBOOK_DIR=../engineering-handbook ./handbook-workflow/scripts/link-project.sh project-c
 ```
-This script dynamically calculates relative paths, manages `.gitignore`, and establishes the symlink.
+
+### Auto-Discovery Order
+When `<handbook-path>` is not provided:
+1. `$HANDBOOK_DIR` environment variable.
+2. Sibling directory `../engineering-handbook` or `../handbook` relative to the target project.
+3. Sibling directory relative to the playbooks repository.
+4. Current working directory if inside the handbook.
 
 ---
 
@@ -138,8 +155,6 @@ This script dynamically calculates relative paths, manages `.gitignore`, and est
 engineering-handbook/
 ├── README.md                          # Master Directory & Thematic Topic Index
 ├── .gitignore                         # OS artifacts & agent directory hygiene
-├── scripts/
-│   └── link-project.sh                # Portable auto-linking script
 └── projects/
     ├── <project-a>/
     │   ├── sprint-1/
@@ -160,7 +175,8 @@ When instructed to *"attach this project to handbook"* or *"use handbook-workflo
 1. **Never commit docs to the project repository.** Always verify `/docs` and `/docs/` are ignored before staging project files.
 2. **Never hardcode machine-specific paths.** Always resolve paths dynamically using environment variables or relative workspace paths.
 3. **Use portable relative links in Markdown.** Never embed absolute filesystem paths (`/Users/...`, `C:\...`) into committed documentation.
-4. **Follow Git Workflow Rules** when committing to `engineering-handbook`:
+4. **Use the bundled helper script.** AI agents should execute `<playbook-root>/handbook-workflow/scripts/link-project.sh <project-path> [handbook-path]` to perform the attachment deterministically.
+5. **Follow Git Workflow Rules** when committing to `engineering-handbook`:
    - Never auto-commit or auto-push without explicit user instruction.
    - Use conventional commits (`docs(<project>): ...`).
    - No `Co-authored-by` or agent attribution trailers.

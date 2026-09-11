@@ -39,6 +39,7 @@ agent-playbooks/
     SKILL.md        ← playbook: learn concepts via small hands-on experiment projects
   handbook-workflow/
     SKILL.md        ← playbook: centralized documentation management for engineering-handbook
+    scripts/        ← portable auto-linking scripts
 ```
 
 
