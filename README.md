@@ -36,5 +36,7 @@ SKILL.md files act as **briefing documents** for agents. The agent reads the SKI
 | `sprint-driven-development` | Structured sprint workflow: discovery → planning → phased execution → retro, with full traceability and LLM delegation support |
 | `repo-triage` | Fast static scan of a newly cloned repo for malware, obfuscation, malicious scripts, network exfiltration, and supply-chain risks |
 | `concept-lab` | Turn engineering concepts into small learning projects — understand → analogy → build → experiment → compare alternatives → break it → reflect |
+| `handbook-workflow` | Centralized documentation management — co-locate sprint docs/findings in projects, zero-leakage symlink, and version control in engineering-handbook |
 
 More coming soon.
+

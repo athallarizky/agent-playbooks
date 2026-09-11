@@ -37,7 +37,10 @@ agent-playbooks/
     SKILL.md        ← playbook: fast malware/supply-chain scan of cloned repos
   concept-lab/
     SKILL.md        ← playbook: learn concepts via small hands-on experiment projects
+  handbook-workflow/
+    SKILL.md        ← playbook: centralized documentation management for engineering-handbook
 ```
+
 
 ## Rules
 
