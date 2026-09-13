@@ -47,6 +47,7 @@ agent-playbooks/
 
 - When a playbook is activated, follow its workflow completely
 - Do NOT skip steps or improvise unless the user asks
+- **Composability:** Playbooks can be combined dynamically when relevant (e.g., nesting `concept-lab` deep-dives or `sprint-driven-development` tracking inside `ai-guided-learning`).
 - **Commit rules:** Never add `Co-authored-by` or agent attribution trailers. Commits are the user's work.
 - **Never auto-commit or auto-push.** Stage, show diff, wait for user instruction.
 

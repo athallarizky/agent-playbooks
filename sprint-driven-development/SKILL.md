@@ -3,12 +3,15 @@
 > Run a software project with an AI agent — structured sprint workflow from discovery to production, with full traceability and handoff support.
 
 ## Trigger
+
 The user will say things like:
+
 - "Let's start a new project with sprint-driven development"
 - "Set up a sprint for [feature/project]"
 - "Plan the next phase"
 - "Write the AGENTS.md for delegation"
 - "Start Phase-N"
+- "Save in findings" / "Record in findings"
 
 ## The Workflow
 
@@ -23,6 +26,7 @@ The user will say things like:
 5. Study real output — run scrapers/APIs to understand actual data shapes
 
 **Questions to ask during Phase 0:**
+
 - Are there existing repos that need to be cloned? Where?
 - What tech stack? Is it decided or needs discussion?
 - What's the project structure (monorepo, separate repos)?
@@ -52,6 +56,7 @@ docs/sprint-N/
     ux-flow.md         — Screen designs, user journey (if UI)
     api-contract.md    — REST/API endpoints, request/response shapes
   rca/                 — Root-cause analyses for gnarly bugs
+  findings/            — Curated discussion notes & Q&A insights (e.g. Redis deep-dive, trade-offs)
 ```
 
 ### Phase Execution (Phase 1 → Phase N)
@@ -126,6 +131,7 @@ Create `docs/ideas/future-enhancements.md` for backlog items and post-MVP ideas.
 ```
 
 **Rules for tasks.md:**
+
 - Every task has an ID, difficulty (Easy/Medium/Hard), dependencies, and status
 - Only ONE task `in_progress` at a time
 - Mark completed only when tested AND working
@@ -134,11 +140,13 @@ Create `docs/ideas/future-enhancements.md` for backlog items and post-MVP ideas.
 
 **Difficulty levels:**
 
-| Level  | Meaning                                    | Example                                  |
-|--------|--------------------------------------------|------------------------------------------|
-| Easy   | ≤30 min, no unknowns, mostly wiring        | "Add endpoint", "Create file structure"  |
-| Medium | 1-2h, some design decisions, integration   | "Build wrapper", "Normalize data"        |
-| Hard   | 3h+, complex logic, multiple edge cases    | "Feature extraction", "SSE streaming"    |
+
+| Level  | Meaning                                  | Example                                 |
+| ------ | ---------------------------------------- | --------------------------------------- |
+| Easy   | ≤30 min, no unknowns, mostly wiring      | "Add endpoint", "Create file structure" |
+| Medium | 1-2h, some design decisions, integration | "Build wrapper", "Normalize data"       |
+| Hard   | 3h+, complex logic, multiple edge cases  | "Feature extraction", "SSE streaming"   |
+
 
 ### `architecture.md`
 
@@ -252,6 +260,7 @@ interface ResponseType { ... }
 ```
 
 **Rules for AGENTS.md:**
+
 - Include EXACT code snippets for critical logic
 - List reference files the agent can copy-paste from
 - Include a numbered checklist — agents follow checklists better than prose
@@ -353,16 +362,60 @@ Write one whenever a non-trivial bug burns more than ~2 debug cycles or anything
 ```
 
 **Rules for RCA:**
+
 - Lead with the root cause in the Summary — don't bury it
 - Tag every Timeline row (`real fix` / `red herring` / `the cause`) — the red herrings are the most valuable part
 - Capture the symptom signature so the same class of bug is recognizable next time
 - Write it the same day, while the debug trail is fresh
+
+### `findings/<slug>.md` — Technical Discussions & Q&A Notes
+
+Save curated discussion notes, technical deep-dives, or Q&A explorations with the agent whenever the user says **"catat dalam findings"** (or "simpan di findings", "record in findings").
+
+For example, when building an application using Redis and the human asks detailed questions about Redis data structures, eviction policies, clustering, or connection pooling, the agent synthesizes the discussion into `docs/sprint-N/findings/redis-<topic>.md`.
+
+````markdown
+# Technical Findings: <Topic Name>
+
+> **Date:** YYYY-MM-DD · **Sprint:** sprint-N · **Context:** <why this discussion took place, e.g., evaluating caching layer for session management>
+
+## 1. Summary & Key Decisions
+<2-3 sentences: high-level takeaways, conclusions, and decisions agreed upon during the discussion.>
+
+## 2. Core Concepts & Q&A Deep-Dive
+<Structured explanation of the concepts discussed and answers to the user's questions.>
+
+## 3. Options & Trade-offs
+| Option | Pros | Cons | Recommendation |
+|--------|------|------|----------------|
+| Option A | ... | ... | ... |
+| Option B | ... | ... | ... |
+
+## 4. Practical Implementation / Code Snippets
+```<language>
+<concrete code snippet, configuration, schema, or command discussed>
+```
+
+## 5. Impact on Current Sprint & Project
+- **Affected Services / Files:** `src/...`
+- **Follow-up Tasks:** <task IDs in tasks.md, if applicable>
+- **Open Questions:** <anything remaining to explore or verify>
+````
+
+**Rules for findings:**
+
+- Triggered whenever the user says **"catat dalam findings"**, **"simpan ke findings"**, or **"record in findings"**.
+- Do NOT dump raw chat logs — synthesize, structure, and highlight conclusions, trade-offs, and practical examples.
+- Name the file descriptively using kebab-case: `docs/sprint-N/findings/<topic-slug>.md` (e.g., `redis-caching-strategy.md`).
+- Cross-reference the finding in `tasks.md` or `final-report.md` if it directly impacts a sprint task.
+- If the project is configured with `handbook-workflow`, findings can also be referenced or curated into `engineering-handbook`.
 
 ---
 
 ## Communication Rules
 
 ### Do
+
 - Ask before committing — "Confirm and I'll commit"
 - Ask before design decisions — "Here's my recommendation, thoughts?"
 - Break down tasks before building
@@ -370,8 +423,10 @@ Write one whenever a non-trivial bug burns more than ~2 debug cycles or anything
 - Update docs after every phase — report + tasks.md update
 - Document findings, not just results — what surprised you, what failed
 - Write an RCA for gnarly bugs
+- Synthesize technical discussions into `docs/sprint-N/findings/<slug>.md` whenever the user says "catat dalam findings"
 
 ### Don't
+
 - Never commit without confirmation
 - Never assume a library is available — check first
 - Never skip the "study real output" step in Phase 0
@@ -392,3 +447,4 @@ Write one whenever a non-trivial bug burns more than ~2 debug cycles or anything
 7. [ ] After each phase, update `tasks.md` and write `reports/phase-N-report.md`
 8. [ ] When delegating, create `AGENTS.md` with checklist + code snippets
 9. [ ] After sprint, write `docs/ideas/future-enhancements.md` for backlog
+
