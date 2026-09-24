@@ -15,6 +15,7 @@ agent-playbooks/
   repo-triage/SKILL.md                 ← Fast malware/supply-chain scan for newly cloned repos
   concept-lab/SKILL.md                 ← Learn engineering concepts via small hands-on experiments
   handbook-workflow/SKILL.md           ← Centralized docs management, symlink sync, zero-leakage
+  pasted-content-cleanup/SKILL.md      ← Clean up, format, and de-noise pasted web clipper markdown
 ```
 
 ## How It Works
@@ -38,6 +39,7 @@ SKILL.md files act as **briefing documents** for agents. The agent reads the SKI
 | `repo-triage` | Fast static scan of a newly cloned repo for malware, obfuscation, malicious scripts, network exfiltration, and supply-chain risks |
 | `concept-lab` | Turn engineering concepts into small learning projects — understand → analogy → build → experiment → compare alternatives → break it → reflect |
 | `handbook-workflow` | Centralized documentation management — co-locate sprint docs/findings in projects, zero-leakage symlink, and version control in engineering-handbook |
+| `pasted-content-cleanup` | Clean up, format, and remove noise from content clipped/pasted from web extensions (e.g. webpage-to-md) without losing core content |
 
 More coming soon.
 

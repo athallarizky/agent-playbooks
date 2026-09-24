@@ -14,6 +14,28 @@ When the user says something like:
 
 Read the corresponding `SKILL.md` file and follow its workflow exactly.
 
+## Combining Playbooks with External Skills
+
+Playbooks run standalone by default. External skills (context7, superpowers, etc.) are used **only when explicitly mentioned** by the user.
+
+Example request:
+
+> "Buatkan materi (concept-lab), brainstorm pakai skill superpowers, context7 untuk dokumentasi terbaru"
+
+Means:
+
+1. Run the `concept-lab` playbook as the **primary workflow**
+2. At the ideation/design step, apply superpowers' `brainstorming` skill
+3. When technology selection or current documentation is needed, query context7
+
+**Resolution order for a mentioned external skill:**
+
+1. Native registration in the current harness (Skill tool, MCP tools) — use it directly
+2. Otherwise read the skill file from disk and follow it, e.g. superpowers: `~/.claude/plugins/cache/claude-plugins-official/superpowers/*/skills/<name>/SKILL.md`
+3. If it cannot be resolved, say so and continue the playbook without it
+
+Do not auto-invoke external skills that the user did not mention.
+
 ## Structure
 
 ```
@@ -40,6 +62,8 @@ agent-playbooks/
   handbook-workflow/
     SKILL.md        ← playbook: centralized documentation management for engineering-handbook
     scripts/        ← portable auto-linking scripts
+  pasted-content-cleanup/
+    SKILL.md        ← playbook: clean up, format, and de-noise pasted web clipper markdown
 ```
 
 
@@ -50,6 +74,16 @@ agent-playbooks/
 - **Composability:** Playbooks can be combined dynamically when relevant (e.g., nesting `concept-lab` deep-dives or `sprint-driven-development` tracking inside `ai-guided-learning`).
 - **Commit rules:** Never add `Co-authored-by` or agent attribution trailers. Commits are the user's work.
 - **Never auto-commit or auto-push.** Stage, show diff, wait for user instruction.
+
+### Global Dispatch (use playbooks from any harness)
+
+To make playbooks invokable from any harness **without symlinks or copies**, add this line to that harness's global config file (see locations table below):
+
+> Personal playbooks live in `~/development/personal/agent-playbooks/<name>/SKILL.md`. When the user mentions a playbook by name (e.g. `/concept-lab` or "use the concept-lab playbook"), read that `SKILL.md` and follow it exactly.
+
+The repo stays the single source of truth — every harness dispatches to it by reference.
+
+Harnesses with a native skills directory (e.g. Claude Code's `~/.claude/skills/`) can optionally symlink playbook dirs there for native `/name` invocation instead.
 
 ### Saving Playbook Rules Globally
 
