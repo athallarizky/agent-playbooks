@@ -16,6 +16,7 @@ agent-playbooks/
   concept-lab/SKILL.md                 ← Learn engineering concepts via small hands-on experiments
   handbook-workflow/SKILL.md           ← Centralized docs management, symlink sync, zero-leakage
   pasted-content-cleanup/SKILL.md      ← Clean up, format, and de-noise pasted web clipper markdown
+  cross-lang-analogy/SKILL.md          ← Explain new programming languages via analogies from familiar ones
 ```
 
 ## How It Works
@@ -40,6 +41,7 @@ SKILL.md files act as **briefing documents** for agents. The agent reads the SKI
 | `concept-lab` | Turn engineering concepts into small learning projects — understand → analogy → build → experiment → compare alternatives → break it → reflect |
 | `handbook-workflow` | Centralized documentation management — co-locate sprint docs/findings in projects, zero-leakage symlink, and version control in engineering-handbook |
 | `pasted-content-cleanup` | Clean up, format, and remove noise from content clipped/pasted from web extensions (e.g. webpage-to-md) without losing core content |
+| `cross-lang-analogy` | Explain new programming language syntax and paradigms via 1-to-1 analogies from familiar languages |
 
 More coming soon.
 

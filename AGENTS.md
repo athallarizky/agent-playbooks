@@ -64,6 +64,8 @@ agent-playbooks/
     scripts/        ← portable auto-linking scripts
   pasted-content-cleanup/
     SKILL.md        ← playbook: clean up, format, and de-noise pasted web clipper markdown
+  cross-lang-analogy/
+    SKILL.md        ← playbook: explain new programming languages via analogies from familiar ones
 ```
 
 
