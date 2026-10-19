@@ -19,8 +19,11 @@ b64="$(base64 < "$wf")"
 ok=0; upd=0; fail=0
 while read -r repo; do
   [ -z "$repo" ] && continue
-  sha=$(gh api "repos/$repo/contents/.github/workflows/malware-guard.yml" --jq '.sha' 2>/dev/null)
-  if [ -n "$sha" ]; then echo "EXISTS   $repo (skip — sudah terpasang)"; upd=$((upd+1)); continue; fi
+  # NOTE: on HTTP errors gh api prints the error JSON to STDOUT — test the
+  # exit status, never the emptiness of captured output.
+  if gh api "repos/$repo/contents/.github/workflows/malware-guard.yml" --jq '.sha' >/dev/null 2>&1; then
+    echo "EXISTS   $repo (skip — sudah terpasang)"; upd=$((upd+1)); continue
+  fi
   out=$(gh api -X PUT "repos/$repo/contents/.github/workflows/malware-guard.yml" \
     -f message="ci: add malware-guard workflow (security)" -f content="$b64" ${sha:+-f sha="$sha"} --jq '.commit.sha[0:8]' 2>&1)
   if [ $? -eq 0 ]; then echo "DEPLOYED $repo ($out)"; ok=$((ok+1))
