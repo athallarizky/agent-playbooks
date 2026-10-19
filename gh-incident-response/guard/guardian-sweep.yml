@@ -55,7 +55,7 @@ jobs:
               [ -z "${path:-}" ] && continue
               case "$path" in
                 .vscode/tasks.json|*/.vscode/tasks.json|.vscode/settings.json|*/.vscode/settings.json) ;;
-                api.js|*/api.js|.env|*/.env|config.bat|*/config.bat|.gitignore|*.config.js|*.config.ts|*.config.mjs|*.config.cjs|package.json) ;;
+                api.js|*/api.js|.env|*/.env|config.bat|*/config.bat|.gitignore|*.config.js|*.config.ts|*.config.mjs|*.config.cjs|*.config.mts|*.config.cts|.eslintrc*|*/.eslintrc*|.prettierrc*|*/.prettierrc*|.postcssrc*|*/.postcssrc*|.babelrc*|*/.babelrc*|.stylelintrc*|*/.stylelintrc*|package.json) ;;
                 *.woff|*.woff2|*.ttf|*.otf|*.eot) [ "${size:-0}" -lt 10240 ] || continue ;;
                 *) continue ;;
               esac
@@ -73,7 +73,7 @@ jobs:
                   done < <(echo "$c" | grep -oE '"[A-Za-z0-9+/=]{16,}"' | tr -d '"') ;;
                 config.bat|*/config.bat) findings="$findings~$rc@$br :: $path (stage-2 dropper)" ;;
                 .gitignore) echo "$c" | grep -qxE '\*\.bat|[A-Za-z0-9_.-]+\.bat' && findings="$findings~$rc@$br :: $path (campaign fingerprint: bat ignore line)" ;;
-                *.config.js|*.config.ts|*.config.mjs|*.config.cjs)
+                *.config.js|*.config.ts|*.config.mjs|*.config.cjs|*.config.mts|*.config.cts|.eslintrc*|*/.eslintrc*|.prettierrc*|*/.prettierrc*|.postcssrc*|*/.postcssrc*|.babelrc*|*/.babelrc*|.stylelintrc*|*/.stylelintrc*)
                   echo "$c" | grep -qE 'function (spin|peel|splitLane)\(' && echo "$c" | grep -qE '\(global, ?require\)|var z ?=' && findings="$findings~$rc@$br :: $path (build-config rider)" ;;
                 package.json)
                   echo "$c" | grep -qE '"(post|pre)install":[[:space:]]*"[^"]*(curl|wget)[^"]*\|[[:space:]]*(sh|bash)|node[[:space:]]+-e' && findings="$findings~$rc@$br :: $path (npm lifecycle dropper)" ;;

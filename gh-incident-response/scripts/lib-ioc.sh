@@ -29,8 +29,11 @@ ioc_stage1_candidates() {
     $1 == ".gitignore"                                             { print $1; next }
     # build-tool config files — the "config rider" class (payload appended to
     # vite/next/webpack/... configs, executes on dev/build). Content-gated.
-    $1 ~ /(^|\/)(vite|next|webpack|postcss|tailwind|nuxt|svelte|rollup|babel|eslint|prettier|vue|metro|react-native|capacitor|astro|remix|karma|cypress|playwright|vitest|jest)\.config\.(js|ts|mjs|cjs)$/ { print $1; next }
-    $1 ~ /(^|\/)\.eslintrc(\.js|\.cjs|\.json)?$/                   { print $1; next }
+    # Cover EVERY executable config surface: *.config.* + dotfile rc forms.
+    $1 ~ /(^|\/)(vite|next|webpack|rspack|postcss|tailwind|nuxt|svelte|rollup|babel|eslint|prettier|vue|metro|react-native|capacitor|astro|remix|karma|cypress|playwright|vitest|jest|docusaurus|electron\.vite)\.config\.(js|ts|mjs|cjs|mts|cts)$/ { print $1; next }
+    $1 ~ /(^|\/)\.(eslintrc|prettierrc|postcssrc|babelrc|stylelintrc)(\.(js|cjs|mjs|json))?$/ { print $1; next }
+    $1 ~ /(^|\/)\.vitepress\/config\.(js|ts)$/                     { print $1; next }
+    $1 ~ /(^|\/)(gatsby-config|gatsby-node)\.(js|ts)$/             { print $1; next }
     $1 == "package.json" || $1 ~ /\/package\.json$/                { print $1 }
   '
   if [ -f "$IOC_NAMES_FILE" ]; then
@@ -108,7 +111,7 @@ ioc_path_is_malicious() {
     config.bat|*/config.bat)                     return 0 ;;
     .gitignore|*/.gitignore)                     ioc_gitignore_injected ;;
     package.json|*/package.json)                 ioc_pkg_lifecycle ;;
-    *.config.js|*.config.ts|*.config.mjs|*.config.cjs|.eslintrc*|*/.eslintrc*) ioc_config_rider ;;
+    *.config.js|*.config.ts|*.config.mjs|*.config.cjs|*.config.mts|*.config.cts|.eslintrc*|*/.eslintrc*|.prettierrc*|*/.prettierrc*|.postcssrc*|*/.postcssrc*|.babelrc*|*/.babelrc*|.stylelintrc*|*/.stylelintrc*) ioc_config_rider ;;
     *.woff|*.woff2|*.ttf|*.otf|*.eot)            ioc_font_malicious ;;
     *) return 1 ;;
   esac
