@@ -33,6 +33,7 @@ jobs:
           GUARDIAN: ${{ github.repository }}
         run: |
           set -u
+          set +e   # the runner invokes bash -e; this script handles errors explicitly
           if [ -z "${PAT:-}" ]; then
             echo "::error title=GUARD_PAT kosong::secret GUARD_PAT belum diisi (set ulang: gh secret set GUARD_PAT -R athallarizky/guardian)"
             exit 1
@@ -83,12 +84,17 @@ jobs:
             done <<< "$tree"
           }
 
-          targets=$(GH_TOKEN="$PAT" gh api --paginate "user/repos?type=owner&per_page=100" --jq '.[] | select(.fork == false) | .full_name' 2>/dev/null)
+          targets=$(GH_TOKEN="$PAT" gh api --paginate "user/repos?type=owner&per_page=100" --jq '.[] | select(.fork == false) | .full_name' 2>/dev/null) || targets=""
           for org in $ORGS; do
-            orgrepos=$(GH_TOKEN="$PAT" gh api --paginate "orgs/$org/repos?per_page=100" --jq '.[].full_name' 2>/dev/null)
+            orgrepos=$(GH_TOKEN="$PAT" gh api --paginate "orgs/$org/repos?per_page=100" --jq '.[].full_name' 2>/dev/null) || orgrepos=""
             targets="$targets
           $orgrepos"
           done
+
+          if [ -z "${targets//[$'\n'\r' ']/}" ]; then
+            echo "::error title=target-listing gagal::repo listing kosong (rate-limit? cek PAT) — sweep dibatalkan agar tidak false-clean"
+            exit 1
+          fi
 
           n=0
           while read -r repo; do
