@@ -32,21 +32,26 @@ Work through these with `gh api` (authenticated as the account owner):
 2. **History-rewrite signature** — a PushEvent with **0 new commits but `before` ≠ `head`** means a ref was force-moved without new objects: a rewind, or a swap to a *lookalike commit*. Lookalike = same commit message + same author date + **different SHA**. That is tampering, not syncing.
 3. **Actor identity** — check `.actor.login` on the events. User's own login → a user credential (OAuth app token, PAT, CLI token, SSH key) was used. A bot/app login → a GitHub App token; those never appear in the *user's* security log, only org/repo audit logs.
 4. **Repo-level cross-check** — `pushed_at` fresh but default-branch tip old ⇒ non-default branches or tags were touched. List branches; compare tips against pre-incident expectations.
-5. **Marker scan, ALL branches, DEEP paths** — payloads hide in nested directories (`docs/`, fixtures, test snapshots, deep source trees), never only at the repo root. Scan recursively:
+5. **Marker scan, ALL branches, DEEP paths, size-aware** — payloads hide in nested directories (`docs/`, fixtures, test snapshots, deep source trees), never only at the repo root, and under rotating filenames. Fetch the recursive tree **with blob sizes** — sizes come free in the same API call, zero extra requests:
    ```bash
-   gh api "repos/<owner>/<repo>/git/trees/<branch>?recursive=1" --jq '.tree[].path' | grep -E '<ioc-path-regex>'
+   gh api "repos/<owner>/<repo>/git/trees/<branch>?recursive=1" --jq '.tree[] | select(.type=="blob") | "\(.path) \(.size)"'
    ```
-   Use `scripts/scan-ioc.sh` to sweep every repo/branch systematically (two-stage: tree-path filter, then content-marker check).
+   Candidates = `.vscode` task/settings files, fonts-dir READMEs, and **any font file (`woff/woff2/ttf/otf/eot`) smaller than ~10KB regardless of name** — then content-marker checks decide. Use `scripts/scan-ioc.sh` to sweep every repo/branch this way.
 6. **Scope the blast radius**: own repos, forks, org repos, collaborator repos — anything the stolen credential could write to. Check `permissions.push` per repo for what the current token can reach (and therefore what the attacker could).
 
 ### IOC Reference (known campaign; extend as new ones are seen)
 
+**Detection is layered — never rely on one layer.** (1) *Structural*: `.vscode` task/settings files and fonts-dir READMEs are candidates on sight. (2) *Size*: ANY font file under ~10KB is a candidate regardless of name — blob sizes come free in the trees API call. (3) *Name list* (`scripts/ioc-filenames.txt`, extend from `ossf/malicious-packages` advisories): known-bad filename patterns flag candidates at ANY size — an accelerator, never a gate, because names rotate. (4) *Content markers*: the arbiter for every candidate. Additionally, files referenced by ANY `tasks.json` command are always followed and content-checked, even when the task itself looks benign.
+
 - `.vscode/tasks.json` — a task disguised as a linter (e.g. `eslint-check`), shell command invoking an interpreter (`node`, `python`) on a **font/asset path**, `"runOn": "folderOpen"`, `"hide": true`, `presentation.reveal: "never"`, `close: true`
 - `.vscode/settings.json` — `"task.allowAutomaticTasks": true` plus stealth terminal settings (`hideOnStartup`, `inheritEnv: false`)
 - **Fake font** — a text file (often one line of obfuscated JS: string-array rotation, XOR-hex blobs, `Function()` constructor) named like a real font with a typo/plural variant, e.g. `fa-brand-400.woff` next to legitimate `fa-brands-400.*` binaries. Real fonts are binary — `file` reporting *text* on a `.woff` = payload
+- **Payload names rotate** between plausible font weights (observed: `fa-brand-400.woff`, `fa-solid-500.woff2`, `fa-solid-400.woff2`) — so font detection must be **size-based and name-agnostic**: any font file under ~10KB is a suspect (payloads observed as 1-line text / ~7.5KB; real webfonts are binary and rarely <13KB), arbitrated by a content marker check. Never match an exact filename — a name-based IOC will silently miss the next variant
+- **EtherHiding C2** — the woff payload resolves its command-and-control address from Ethereum transactions (fixed sender address, first bytes of the `to` address encode IPs), fetches a second stage over plain HTTP, XOR-decrypts it, and runs it via a detached, hidden child process. The sender address is catalogued in `ossf/malicious-packages` (`MAL-2026-*` advisories) — check there for current campaign IOCs
 - `fonts/README.md` camouflage copy referencing an unrelated app
-- `.gitignore` gaining odd entries (e.g. `config.bat` — a stage-2 name)
+- `.gitignore` gaining a stage-2 ignore line — observed variants: `config.bat`, `*.bat`, **`temp_auto_push.bat`, `temp_interactive_push.bat`**. Present in **every** affected repo, so it doubles as a campaign fingerprint. Purpose: stealth (the dropped stage-2 file never shows in `git status`). The `temp_*_push` names suggest a **self-propagation helper** — a script that commits+pushes the infection using the victim's own local git credentials, which would explain repos "infected from their initial commit". If those files exist on a disk, that host ran the pusher: hunt for them during local triage
 - Commit messages/dates copied verbatim from the originals they replaced (lookalike rewrite)
+- **Cleanup-mutation trap** — documented case of a "security: remove malware" commit that only RENAMED the payload (`fa-solid-400` → `fa-solid-500`) and repointed the task at it, leaving the repo "clean-looking" for weeks. Consequence: after any cleanup, re-verify by CONTENT markers (file gone ≠ repo clean), and expect renamed variants on re-infection
 
 ## Phase 2 — Evidence Preservation (still read-only)
 

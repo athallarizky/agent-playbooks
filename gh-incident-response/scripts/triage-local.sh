@@ -43,6 +43,11 @@ if [ -n "$SINCE" ]; then
   echo "(empty = nothing synced during the window)"
 fi
 
+echo "--- stage-2 pusher artifacts (SMOKING GUN: host ran the campaign's pusher)"
+find "$HOME" -maxdepth 6 \( -path "$HOME/Library" -o -path "$HOME/.Trash" \) -prune -o \
+  -type f \( -name 'temp_auto_push.bat' -o -name 'temp_interactive_push.bat' -o -name 'config.bat' \) -print 2>/dev/null
+echo "(empty = pusher never ran on this host)"
+
 echo
 echo "===== 2. SUSPICIOUS PROCESSES ====="
 ps axo pid,ppid,lstart,command 2>/dev/null > /tmp/ghir_ps.$$ || ps axo pid,ppid,args > /tmp/ghir_ps.$$

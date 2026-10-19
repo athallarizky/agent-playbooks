@@ -1,0 +1,21 @@
+# Known-bad filename patterns for gh-incident-response — one POSIX ERE per
+# line, matched against full repo-relative paths.
+# Source for new entries: ossf/malicious-packages advisories (MAL-2026-*).
+#
+# ROLE: this list is an ACCELERATOR — a match marks the file a suspect at ANY
+# size, instantly. It is NOT a gate: payload names rotate (fa-brand-400 ->
+# fa-solid-500 -> fa-solid-400 observed), so the size-aware layer and the
+# content marker check remain the primary defense. False positives here only
+# cost one content check (e.g. legitimate fa-brands-400 fonts match and pass).
+
+# Fake FontAwesome payload fonts (note: real FA weights are brands-400,
+# regular-400, solid-900, v4-shims — "fa-solid-400/500" are impostors)
+(^|/)fa-(brand|brands|solid|regular)-[0-9]+\.(woff2?|ttf|otf|eot)$
+
+# Stage-2 dropper name seen injected into .gitignore
+(^|/)config\.bat$
+
+# Stage-2 self-propagation helpers — ignore-lines observed in campaign
+# .gitignore injections (temp_auto_push.bat / temp_interactive_push.bat);
+# if these FILES exist on a disk, that host ran the payload's pusher
+(^|/)temp_(auto|interactive)_push\.bat$
