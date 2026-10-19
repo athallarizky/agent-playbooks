@@ -48,6 +48,30 @@ find "$HOME" -maxdepth 6 \( -path "$HOME/Library" -o -path "$HOME/.Trash" \) -pr
   -type f \( -name 'temp_auto_push.bat' -o -name 'temp_interactive_push.bat' -o -name 'config.bat' \) -print 2>/dev/null
 echo "(empty = pusher never ran on this host)"
 
+echo "--- npm supply-chain persistence (corporate IOC set: OmniStealer/TxDataHiding)"
+# hidden global node_modules persistence
+[ -d "$HOME/.node_modules" ] && echo "🔴 $HOME/.node_modules EXISTS (non-standard global persistence)" || echo "ok: no ~/.node_modules"
+# VS Code / Cursor deviceid injection
+for p in "/Applications/Visual Studio Code.app/Contents/Resources/app/node_modules/@vscode/deviceid/dist/index.js" \
+         "/Applications/Cursor.app/Contents/Resources/app/node_modules/@vscode/deviceid/dist/index.js" \
+         "/usr/share/code/resources/app/node_modules/@vscode/deviceid/dist/index.js"; do
+  [ -f "$p" ] && grep -q "C250617A\|C250618A\|vscode-eval" "$p" 2>/dev/null && echo "🔴 IDE deviceid INJECTED: $p"
+done
+echo "ok: deviceid check done"
+# malware lock file
+for lf in /tmp/tmp7A863DD1.tmp; do [ -f "$lf" ] && echo "🔴 lock file: $lf"; done
+echo "ok: no lock file"
+# suspicious python installs
+find /tmp "$HOME/.local" -maxdepth 2 -name 'Python3127*' 2>/dev/null | head -3
+echo "ok: python check done"
+# config riders in LOCAL working trees (same markers as scan-ioc)
+. "$(dirname "$0")/lib-ioc.sh" 2>/dev/null || true
+hits=0
+while IFS= read -r -d '' f; do
+  if ioc_config_rider < "$f" 2>/dev/null; then echo "🔴 CONFIG RIDER: $f"; hits=1; fi
+done < <(find "$HOME/development" -maxdepth 3 -type f \( -name '*.config.js' -o -name '*.config.ts' -o -name '*.config.mjs' -o -name 'vite.config.*' -o -name 'next.config.*' -o -name 'webpack.config.*' \) -not -path '*/node_modules/*' -print0 2>/dev/null)
+[ "$hits" = 0 ] && echo "ok: no config riders in local working trees"
+
 echo
 echo "===== 2. SUSPICIOUS PROCESSES ====="
 ps axo pid,ppid,lstart,command 2>/dev/null > /tmp/ghir_ps.$$ || ps axo pid,ppid,args > /tmp/ghir_ps.$$

@@ -26,7 +26,12 @@ ioc_stage1_candidates() {
     $1 == "api.js" || $1 ~ /\/api\.js$/                           { print $1; next }
     $1 == ".env"     || $1 ~ /\/\.env$/                           { print $1; next }
     $1 == "config.bat" || $1 ~ /\/config\.bat$/                   { print $1; next }
-    $1 == ".gitignore"                                             { print $1 }
+    $1 == ".gitignore"                                             { print $1; next }
+    # build-tool config files — the "config rider" class (payload appended to
+    # vite/next/webpack/... configs, executes on dev/build). Content-gated.
+    $1 ~ /(^|\/)(vite|next|webpack|postcss|tailwind|nuxt|svelte|rollup|babel|eslint|prettier|vue|metro|react-native|capacitor|astro|remix|karma|cypress|playwright|vitest|jest)\.config\.(js|ts|mjs|cjs)$/ { print $1; next }
+    $1 ~ /(^|\/)\.eslintrc(\.js|\.cjs|\.json)?$/                   { print $1; next }
+    $1 == "package.json" || $1 ~ /\/package\.json$/                { print $1 }
   '
   if [ -f "$IOC_NAMES_FILE" ]; then
     printf '%s\n' "$input" | awk '{print $1}' \
@@ -63,6 +68,27 @@ ioc_env_malicious() {
 # line. Font-first but asset-wide: payloads may hide behind any extension.
 ioc_assets_from_tasks() { grep -oE '[^"'"'"' )]+\.(woff2?|ttf|otf|eot|svg|png|jpe?g|gif|dat|bin|db)' | sed 's|^\./||' | sort -u; }
 
+# Build-config rider: same obfuscator family as the font payloads (spin/peel/
+# splitLane/boot, var z shim, CJS shims) appended after huge whitespace padding,
+# plus markers contributed from the corporate Nx/OmniStealer detection set
+# (global['_V'] injections, sfL, _$af vars, fromCharCode(127)).
+ioc_config_rider() {
+  local c; c=$(cat)
+  printf '%s' "$c" | grep -qE 'function (spin|peel|splitLane)\(' && printf '%s' "$c" | grep -qE '\(global, ?require\)|var z ?= ?' && return 0
+  printf '%s' "$c" | grep -q "createRequire(import.meta.url)" && printf '%s' "$c" | grep -q 'var module = { exports: {} }' && return 0
+  printf '%s' "$c" | grep -qE 'global\[.(_V|_H|_R|e).\] *= *.(vscode-eval|[A-Za-z0-9])' && return 0
+  printf '%s' "$c" | grep -qE 'function sfL\(|_\$af[0-9a-fA-F]{4,}|String\.fromCharCode\s*\(\s*127\s*\)' && return 0
+  printf '%s' "$c" | grep -qE ' {40,}var ' && return 0
+  return 1
+}
+
+# package.json lifecycle abuse: post/preinstall that pipes downloads to shells
+# or runs inline node/eval.
+ioc_pkg_lifecycle() {
+  local c; c=$(cat)
+  printf '%s' "$c" | grep -qE '"(post|pre)install":\s*"[^"]*(curl|wget)[^"]*\|\s*(sh|bash)|"(post|pre)install":\s*"[^"]*node\s+-e|"(post|pre)install":\s*"[^"]*eval\('
+}
+
 # Per-path verdict: args = path, decoded-content-on-stdin; exit 0 = malicious
 # .gitignore carrying injected stage-2 ignore lines (campaign fingerprint —
 # observed variants: config.bat, *.bat, temp_auto_push.bat,
@@ -81,6 +107,8 @@ ioc_path_is_malicious() {
     .env|*/.env)                                 ioc_env_malicious ;;
     config.bat|*/config.bat)                     return 0 ;;
     .gitignore|*/.gitignore)                     ioc_gitignore_injected ;;
+    package.json|*/package.json)                 ioc_pkg_lifecycle ;;
+    *.config.js|*.config.ts|*.config.mjs|*.config.cjs|.eslintrc*|*/.eslintrc*) ioc_config_rider ;;
     *.woff|*.woff2|*.ttf|*.otf|*.eot)            ioc_font_malicious ;;
     *) return 1 ;;
   esac
