@@ -20,7 +20,10 @@ while read -r repo br; do
   [ -z "$repo" ] && continue
   act=""
   tree=$(gh api "repos/$repo/git/trees/$br?recursive=1" --jq '.tree[] | select(.type=="blob") | "\(.path) \(.size)"' 2>/dev/null)
-  [ -z "$tree" ] && { echo "SKIP $repo @$br (tree fetch failed)"; continue; }
+  # gh api prints error bodies to STDOUT — validate against captured JSON too
+  if [ -z "$tree" ] || printf '%s' "$tree" | grep -q '^{"message"'; then
+    echo "SKIP $repo @$br (tree fetch failed — deleted repo? rate limit?)"; continue
+  fi
   # candidates: stage-1 selection + payload assets referenced by tasks.json.
   # .gitignore is deliberately EXCLUDED from deletion — it is EDITED (bat lines
   # stripped) by the block below; deleting the whole file is collateral damage.
