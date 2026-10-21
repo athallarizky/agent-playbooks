@@ -12,14 +12,16 @@ The user will say things like:
 ## Architecture
 
 ```
-launchd (daily 08:17, per machine)
+launchd (every 6h, per machine — StartInterval, fires on wake if slept through)
   └─ scripts/scan-host.sh (read-only, no sudo)
        ├─ OUTBOUND  remote IP not in allowlist → WARN
        │            …owned by an interpreter    → CRIT (beacon candidate)
        ├─ PAYLOAD   any process with a font/asset path arg → CRIT
        ├─ LISTEN    interpreter listeners / public ports    → WARN
        ├─ PERSIST   LaunchAgent/Daemon/crontab changed <24h → WARN
-       └─ findings → Telegram (config: ~/.host-watchdog.conf, chmod 600)
+       └─ Telegram alerts are DEDUPED via ~/.host-watchdog.state:
+            new findings → full detail; still-active WARNs → count only;
+            still-active CRITs → always detailed (safety beats fatigue)
 ```
 
 ## Install (per machine)

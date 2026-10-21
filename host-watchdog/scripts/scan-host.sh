@@ -100,9 +100,30 @@ while read -r f; do emit WARN "persistence changed <24h: $f"; done < <(find \
 crontab -l 2>/dev/null | grep -q . && emit WARN "crontab non-empty (review manually)"
 
 echo "---"
-echo "VERDICT: warn=$warn crit=$crit host=$(hostname) at $(date '+%F %T')"
+# ── dedup: Telegram details only NEW findings; still-active WARNs collapse to
+# a count, still-active CRITs stay detailed (safety beats fatigue on CRIT) ──
+state_file="${HOST_WATCHDOG_STATE:-$HOME/.host-watchdog.state}"
+prev=""
+[ -f "$state_file" ] && prev=$(cat "$state_file" 2>/dev/null)
+new_out=""; still=0
+while IFS= read -r line; do
+  [ -z "$line" ] && continue
+  if printf '%s\n' "$prev" | grep -qxF "$line"; then
+    still=$((still+1))
+    case "$line" in CRIT*) new_out="${new_out}${line}"$'\n' ;; esac
+  else
+    new_out="${new_out}${line}"$'\n'
+  fi
+done <<< "$out"
+printf '%s' "$out" > "$state_file"
+
+echo "VERDICT: warn=$warn crit=$crit still-active=$still new=$(grep -c . <<< "$new_out" || true) host=$(hostname) at $(date '+%F %T')"
 if [ "$warn" -gt 0 ] || [ "$crit" -gt 0 ]; then
-  notify_tg "⚠️ HOST-WATCHDOG ($(hostname), $(date '+%F %T')) — warn=$warn crit=$crit
-${out}Escalate CRIT with: gh-incident-response triage-local.sh"
+  summary=""
+  [ "$still" -gt 0 ] && summary=" ($still masih aktif dari run sebelumnya — tidak diulang)"
+  if [ -n "$(printf '%s' "$new_out" | tr -d $'\n')" ]; then
+    notify_tg "⚠️ HOST-WATCHDOG ($(hostname), $(date '+%F %T')) — warn=$warn crit=$crit$summary
+${new_out}Escalate CRIT with: gh-incident-response triage-local.sh"
+  fi
 fi
 [ "$crit" -eq 0 ]

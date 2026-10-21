@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# Install the host watchdog as a daily launchd job (macOS).
-# Usage: install.sh [scan-hour] [scan-minute]   (default 8 17)
+# Install the host watchdog as a recurring launchd job (macOS, default 6h).
+# Usage: install.sh [interval-seconds]   (default 21600 = 6 hours)
+# StartInterval (not a calendar time) so a missed slot while asleep fires on
+# wake — a laptop that slept through the interval still gets scanned.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
-hour="${1:-8}"; minute="${2:-17}"
+interval="${1:-21600}"
 
 [ -f "$HOME/.host-watchdog.conf" ] || {
   cp "$here/host-watchdog.example.conf" "$HOME/.host-watchdog.conf"
@@ -21,15 +23,12 @@ cat > "$plist" <<EOF
   <key>ProgramArguments</key><array>
     <string>/bin/bash</string><string>$here/scan-host.sh</string>
   </array>
-  <key>StartCalendarInterval</key><dict>
-    <key>Hour</key><integer>$hour</integer>
-    <key>Minute</key><integer>$minute</integer>
-  </dict>
+  <key>StartInterval</key><integer>$interval</integer>
   <key>StandardOutPath</key><string>$HOME/Library/Logs/host-watchdog.log</string>
   <key>StandardErrorPath</key><string>$HOME/Library/Logs/host-watchdog.log</string>
 </dict></plist>
 EOF
 launchctl unload "$plist" >/dev/null 2>&1 || true
 launchctl load "$plist"
-echo "installed: daily scan at $hour:$(printf '%02d' "$minute") — log: ~/Library/Logs/host-watchdog.log"
+echo "installed: scan every $((interval/3600))h (StartInterval $interval) — log: ~/Library/Logs/host-watchdog.log"
 echo "test now:  bash $here/scan-host.sh"
