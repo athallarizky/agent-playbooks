@@ -22,18 +22,20 @@ launchd (fixed slots 00:07 / 06:07 / 12:07 / 18:07 per machine — night / start
        └─ Telegram alerts are DEDUPED via ~/.host-watchdog.state:
             new findings → full detail; still-active WARNs → count only;
             still-active CRITs → always detailed (safety beats fatigue)
+            EXACTLY ONE message per slot (heartbeat "clean" line otherwise) —
+            a missing slot message means the watchdog itself died
 ```
 
 ## Install (per machine)
 
 ```bash
-bash scripts/install.sh            # 8 17 default = daily 08:17; pass hour minute to change
+bash scripts/install.sh            # default 21600s = every 6h; pass interval-seconds to change
 $EDITOR ~/.host-watchdog.conf      # TG creds (same bot as guardian) + allowlist curation
 bash scripts/scan-host.sh          # immediate first run — expect WARN noise, curate until quiet
 bash scripts/scan-host.sh --test   # verify the Telegram channel
 ```
 
-Log: `~/Library/Logs/host-watchdog.log`. The first run always warns — that IS the calibration workflow: every WARN is either benign (add to `ALLOWED_HOSTS`/`ALLOWED_IPS`/`ALLOWED_LISTEN_PORTS`) or real.
+Log: `~/Library/Logs/host-watchdog.log`. The first run always warns — that IS the calibration workflow: every WARN is either benign (add to `ALLOWED_HOSTS`/`ALLOWED_IPS`/`ALLOWED_LISTEN_PORTS`/`ALLOWED_PROCS`) or real.
 
 ## Triage when it fires
 
@@ -49,3 +51,4 @@ Log: `~/Library/Logs/host-watchdog.log`. The first run always warns — that IS 
 - Config is per-machine and NEVER committed (contains the bot token); the example file stays generic
 - macmini: deploy when it is powered on again (one command); its first runs double as re-entry detection after the incident
 - New normal remote (new job, new tool)? Update the allowlist — don't ignore recurring WARNs; alarm fatigue is the failure mode this design exists to avoid
+- `ALLOWED_PROCS` (globs, e.g. `Browser rapportd ControlCe*`) quiets per-process OUTBOUND/LISTEN WARNs for procs IP/port allowlists can't cover (browsers, ephemeral-port daemons). It can never silence interpreter CRITs or interpreter LISTEN WARNs; loopback-bound interpreter listeners are always skipped as local-only

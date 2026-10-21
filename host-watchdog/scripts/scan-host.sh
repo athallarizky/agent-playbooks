@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Local host watchdog — daily read-only scan for the incident's threat class:
+# Local host watchdog — recurring read-only scan for the incident's threat class:
 # unknown outbound connections (beacon candidates), interpreter processes
 # touching font/asset payloads, unexpected listeners, fresh persistence.
 # macOS-first (lsof); runs as the user, no sudo needed.
@@ -35,6 +35,9 @@ for h in ${ALLOWED_HOSTS:-}; do
   allowed_ips="$allowed_ips $ips"
 done
 ip_allowed() { is_private "$1" && return 0; for a in $allowed_ips; do [ "$1" = "$a" ] && return 0; done; return 1; }
+# glob match (lsof truncates names — e.g. ControlCe*); interpreters are matched
+# BEFORE this is consulted, so an entry here can never silence a beacon CRIT
+proc_allowed() { for p in ${ALLOWED_PROCS:-}; do case "$1" in $p) return 0 ;; esac; done; return 1; }
 
 if [ "${1:-}" = "--test" ]; then
   . /dev/stdin <<EOF
@@ -66,6 +69,8 @@ while read -r proc pid raddr; do
   if ip_allowed "$rip"; then continue; fi
   if echo "$proc" | grep -Eq "$INTERPRETERS_RE"; then
     emit CRIT "beacon candidate: $proc (pid $pid) -> $rip  [interpreter + non-allowlisted remote]"
+  elif proc_allowed "$proc"; then
+    continue
   else
     emit WARN "unknown remote: $proc (pid $pid) -> $rip"
   fi
@@ -87,9 +92,11 @@ while read -r proc pid laddr; do
   interpreter=0; echo "$proc" | grep -Eq "$INTERPRETERS_RE" && interpreter=1
   port_ok=0; for p in ${ALLOWED_LISTEN_PORTS:-}; do [ "$port" = "$p" ] && port_ok=1; done
   if [ "$interpreter" = 1 ]; then
+    # loopback-bound = not remotely reachable; local code is covered by OUTBOUND/PAYLOAD
+    [ "$pub" = 0 ] && continue
     [ "$port_ok" = 1 ] || emit WARN "interpreter listener: $proc (pid $pid) @ $laddr"
   elif [ "$pub" = 1 ] && [ "$port_ok" = 0 ]; then
-    emit WARN "public listener: $proc (pid $pid) @ $laddr"
+    proc_allowed "$proc" || emit WARN "public listener: $proc (pid $pid) @ $laddr"
   fi
 done < <(lsof -nP -iTCP -sTCP:LISTEN 2>/dev/null | awk 'NR>1{print $1, $2, $9}')
 
@@ -118,12 +125,14 @@ done <<< "$out"
 printf '%s' "$out" > "$state_file"
 
 echo "VERDICT: warn=$warn crit=$crit still-active=$still new=$(grep -c . <<< "$new_out" || true) host=$(hostname) at $(date '+%F %T')"
-if [ "$warn" -gt 0 ] || [ "$crit" -gt 0 ]; then
-  summary=""
-  [ "$still" -gt 0 ] && summary=" ($still masih aktif dari run sebelumnya — tidak diulang)"
-  if [ -n "$(printf '%s' "$new_out" | tr -d $'\n')" ]; then
-    notify_tg "⚠️ HOST-WATCHDOG ($(hostname), $(date '+%F %T')) — warn=$warn crit=$crit$summary
+summary=""
+[ "$still" -gt 0 ] && summary=" ($still masih aktif dari run sebelumnya — tidak diulang)"
+if [ -n "$(printf '%s' "$new_out" | tr -d $'\n')" ]; then
+  notify_tg "⚠️ HOST-WATCHDOG ($(hostname), $(date '+%F %T')) — warn=$warn crit=$crit$summary
 ${new_out}Escalate CRIT with: gh-incident-response triage-local.sh"
-  fi
+else
+  # heartbeat: exactly one message per slot — a MISSING slot message (not a
+  # silent one) is the signal that the watchdog itself died
+  notify_tg "✅ HOST-WATCHDOG ($(hostname), $(date '+%F %T')) — clean, no new findings${summary:+$summary}"
 fi
 [ "$crit" -eq 0 ]
