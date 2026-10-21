@@ -1,6 +1,6 @@
 # GitHub Incident Response
 
-> Investigate, contain, and recover from a GitHub account or repository compromise — mass forced pushes, history rewrites, injected malware, and stolen tokens. Companion to `repo-triage` (which scans one cloned repo): this playbook runs the full response when YOUR GitHub is the victim.
+> Investigate, contain, and recover from a GitHub account or repository compromise — mass forced pushes, history rewrites, injected malware, and stolen tokens. Companion to `repo-triage` (which scans one cloned repo) and `guardian-protection` (which prevents and monitors — rulesets, in-repo guards, guardian ops): this playbook runs the full response when YOUR GitHub is the victim.
 
 ## Trigger
 
