@@ -17,10 +17,13 @@ echo "$repo" | "$here/protect-repos.sh" /dev/stdin || true
 has_ruleset=$(gh api "repos/$repo/rulesets" --jq '[.[].name == "malware-guard"] | any' 2>/dev/null)
 
 echo "== 2/3 in-repo guard (fallback for private repos) =="
+has_guard=$(gh api "repos/$repo/contents/.github/workflows/malware-guard.yml" --jq '.name' >/dev/null 2>&1 && echo yes || echo no)
 if [ "$has_ruleset" = "true" ]; then
   echo "skip: ruleset active — in-repo guard not needed"
+elif [ "$has_guard" = "yes" ]; then
+  echo "skip: in-repo guard already present"
 elif echo "$repo" | "$here/deploy-guard.sh" /dev/stdin; then
-  echo "guard workflow deployed"
+  echo "in-repo guard workflow deployed"
 else
   echo "WARN: neither ruleset nor in-repo guard installed — repo is UNPROTECTED" >&2
 fi
