@@ -12,7 +12,7 @@ The user will say things like:
 ## Architecture
 
 ```
-launchd (every 6h, per machine — StartInterval, fires on wake if slept through)
+launchd (fixed slots 00:07 / 06:07 / 12:07 / 18:07 per machine — night / start of work / lunch / end of work; missed slots fire on wake)
   └─ scripts/scan-host.sh (read-only, no sudo)
        ├─ OUTBOUND  remote IP not in allowlist → WARN
        │            …owned by an interpreter    → CRIT (beacon candidate)
