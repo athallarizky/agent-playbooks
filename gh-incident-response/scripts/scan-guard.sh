@@ -20,8 +20,10 @@ root="${1:?usage: scan-guard.sh <scan-root> [--all|--dry]}"
 mode="${2:-surgical}"
 root="$(cd "$root" 2>/dev/null && pwd)" || { echo "scan-root tidak ada: $1"; exit 1; }
 
-# editor process-name patterns (match binary paths via pgrep -f)
-EDITORS='Visual Studio Code|Electron.*[Vv]scode|VSCodium|Cursor|Windsurf'
+# editor app-bundle paths — match the INSTALL LOCATION, not loose substrings:
+# a naive 'Cursor' pattern matches macOS CursorUIViewService.xpc (text cursor),
+# and orphaned chrome_crashpad_handler matches 'Visual Studio Code.app'.
+EDITORS='Applications/Visual Studio Code\.app|Applications/VSCodium\.app|Applications/Cursor\.app|Applications/Windsurf\.app|Applications/Code - Insiders\.app'
 
 kill_pids() {  # $@ = pids; graceful first, force after 3s
   local pids="$*"
