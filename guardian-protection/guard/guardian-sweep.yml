@@ -88,7 +88,7 @@ jobs:
               [ -z "${path:-}" ] && continue
               case "$path" in
                 .vscode/*|*/.vscode/*) findings="$findings~$rc@$br :: $path (.vscode on remote - policy: none allowed)"; continue ;;
-                api.js|*/api.js|.env|*/.env|config.bat|*/config.bat|.gitignore|*.config.js|*.config.ts|*.config.mjs|*.config.cjs|*.config.mts|*.config.cts|*.conf.js|*.conf.ts|*.conf.mjs|*.conf.cjs|.eslintrc*|*/.eslintrc*|.prettierrc*|*/.prettierrc*|.postcssrc*|*/.postcssrc*|.babelrc*|*/.babelrc*|.stylelintrc*|*/.stylelintrc*|package.json|scripts/*.ts|scripts/*.js|scripts/*.mjs) ;;
+                api.js|*/api.js|.env|*/.env|config.bat|*/config.bat|.gitignore|*.config.js|*.config.ts|*.config.mjs|*.config.cjs|*.config.mts|*.config.cts|*.conf.js|*.conf.ts|*.conf.mjs|*.conf.cjs|.eslintrc*|*/.eslintrc*|.prettierrc*|*/.prettierrc*|.postcssrc*|*/.postcssrc*|.babelrc*|*/.babelrc*|.stylelintrc*|*/.stylelintrc*|package.json|scripts/*.ts|scripts/*.js|scripts/*.mjs|index.ts|*/index.ts|main.ts|*/main.ts|app.ts|*/app.ts|server.ts|*/server.ts|cli.ts|*/cli.ts) ;;
                 *.woff|*.woff2|*.ttf|*.otf|*.eot|*.orc) [ "${size:-0}" -lt 10240 ] || continue ;;
                 *) continue ;;
               esac
@@ -104,7 +104,7 @@ jobs:
                 .gitignore) echo "$c" | grep -qxE '\*\.bat|[A-Za-z0-9_.-]+\.bat' && findings="$findings~$rc@$br :: $path (campaign fingerprint: bat ignore line)" ;;
                 *.config.js|*.config.ts|*.config.mjs|*.config.cjs|*.config.mts|*.config.cts|*.conf.js|*.conf.ts|*.conf.mjs|*.conf.cjs|.eslintrc*|*/.eslintrc*|.prettierrc*|*/.prettierrc*|.postcssrc*|*/.postcssrc*|.babelrc*|*/.babelrc*|.stylelintrc*|*/.stylelintrc*)
                   echo "$c" | grep -qE 'function (spin|peel|splitLane)\(' && echo "$c" | grep -qE '\(global, ?require\)|var z ?=' && findings="$findings~$rc@$br :: $path (build-config rider)" ;;
-                scripts/*.ts|scripts/*.js|scripts/*.mjs)
+                index.ts|*/index.ts|main.ts|*/main.ts|app.ts|*/app.ts|server.ts|*/server.ts|cli.ts|*/cli.ts|scripts/*.ts|scripts/*.js|scripts/*.mjs)
                   echo "$c" | grep -q 'atob(process\.env\.AUTH_API_KEY)' && findings="$findings~$rc@$br :: $path (okshanaby loader)" ;;
                 package.json)
                   echo "$c" | grep -qE '"(post|pre)install":[[:space:]]*"[^"]*(curl|wget)[^"]*\|[[:space:]]*(sh|bash)|node[[:space:]]+-e' && findings="$findings~$rc@$br :: $path (npm lifecycle dropper)" ;;

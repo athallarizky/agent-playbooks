@@ -17,6 +17,14 @@ IOC_NAMES_FILE="$(cd "$(dirname "$0")" && pwd)/ioc-filenames.txt"
 # Stage-1 candidate selection — zero extra API calls.
 # stdin : "<path> <size>" lines from the recursive trees API response.
 # stdout: paths that deserve a stage-2 content check (L1 ∪ L2 ∪ L3).
+# Whole-tree IOC strings — so specific they bypass path filtering entirely.
+# Any file containing these is malicious regardless of name/location.
+ioc_wholetree_hit() {  # stdin = file content; exit 0 = campaign IOC present
+  local c; c=$(cat)
+  printf '%s' "$c" | grep -q 'atob(process\.env\.AUTH_API_KEY)' && return 0
+  return 1
+}
+
 ioc_stage1_candidates() {
   local input; input=$(cat)
   printf '%s\n' "$input" | awk -v max="$FONT_SUSPECT_MAX" '
@@ -33,6 +41,7 @@ ioc_stage1_candidates() {
     $1 ~ /(^|\/)(vite|next|webpack|rspack|postcss|tailwind|nuxt|svelte|rollup|babel|eslint|prettier|vue|metro|react-native|capacitor|astro|remix|karma|cypress|playwright|vitest|jest|docusaurus|electron\.vite)\.(config|conf)\.(js|ts|mjs|cjs|mts|cts)$/ { print $1; next }
     $1 ~ /(^|\/)\.(eslintrc|prettierrc|postcssrc|babelrc|stylelintrc)(\.(js|cjs|mjs|json))?$/ { print $1; next }
     $1 ~ /(^|\/)scripts\/[^\/]+\.(ts|js|mjs)$/ { print $1; next }
+    $1 ~ /(^|\/)(index|main|app|server|cli)\.(ts|js|mjs)$/ { print $1; next }
     $1 ~ /(^|\/)\.vitepress\/config\.(js|ts)$/                     { print $1; next }
     $1 ~ /(^|\/)(gatsby-config|gatsby-node)\.(js|ts)$/             { print $1; next }
     $1 == "package.json" || $1 ~ /\/package\.json$/                { print $1 }
@@ -114,20 +123,24 @@ ioc_oksh_loader() {
 ioc_gitignore_injected() { local c; c=$(cat); printf '%s' "$c" | grep -qxE '\*\.bat|[A-Za-z0-9_.-]+\.bat'; }
 
 ioc_path_is_malicious() {
-  local p="$1"
+  local p="$1" buf
+  buf=$(cat)
+  # Whole-tree IOC check FIRST — catches okshanaby in ANY file location
+  printf '%s' "$buf" | ioc_wholetree_hit && return 0
   case "$p" in
-    .vscode/tasks.json|*/.vscode/tasks.json)     ioc_tasks_malicious ;;
-    .vscode/settings.json|*/.vscode/settings.json) ioc_settings_malicious ;;
-    fonts/README.md|*/fonts/README.md)           ioc_readme_camouflage ;;
-    api.js|*/api.js)                             ioc_js_payload ;;
-    .env|*/.env)                                 ioc_env_malicious ;;
+    .vscode/tasks.json|*/.vscode/tasks.json)     printf '%s' "$buf" | ioc_tasks_malicious ;;
+    .vscode/settings.json|*/.vscode/settings.json) printf '%s' "$buf" | ioc_settings_malicious ;;
+    fonts/README.md|*/fonts/README.md)           printf '%s' "$buf" | ioc_readme_camouflage ;;
+    api.js|*/api.js)                             printf '%s' "$buf" | ioc_js_payload ;;
+    .env|*/.env)                                 printf '%s' "$buf" | ioc_env_malicious ;;
     config.bat|*/config.bat)                     return 0 ;;
-    .gitignore|*/.gitignore)                     ioc_gitignore_injected ;;
-    package.json|*/package.json)                 ioc_pkg_lifecycle ;;
+    .gitignore|*/.gitignore)                     printf '%s' "$buf" | ioc_gitignore_injected ;;
+    package.json|*/package.json)                 printf '%s' "$buf" | ioc_pkg_lifecycle ;;
     *.config.js|*.config.ts|*.config.mjs|*.config.cjs|*.config.mts|*.config.cts|*.conf.js|*.conf.ts|*.conf.mjs|*.conf.cjs|.eslintrc*|*/.eslintrc*|.prettierrc*|*/.prettierrc*|.postcssrc*|*/.postcssrc*|.babelrc*|*/.babelrc*|.stylelintrc*|*/.stylelintrc*)
-      local buf; buf=$(cat); printf '%s' "$buf" | ioc_config_rider && return 0; printf '%s' "$buf" | ioc_oksh_loader ;;
-    scripts/*.ts|scripts/*.js|scripts/*.mjs) ioc_oksh_loader ;;
-    *.woff|*.woff2|*.ttf|*.otf|*.eot|*.orc)       ioc_font_malicious ;;
+      printf '%s' "$buf" | ioc_config_rider && return 0
+      printf '%s' "$buf" | ioc_oksh_loader ;;
+    scripts/*.ts|scripts/*.js|scripts/*.mjs)      printf '%s' "$buf" | ioc_oksh_loader ;;
+    *.woff|*.woff2|*.ttf|*.otf|*.eot|*.orc)       printf '%s' "$buf" | ioc_font_malicious ;;
     *) return 1 ;;
   esac
 }
