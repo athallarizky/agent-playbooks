@@ -104,6 +104,8 @@ jobs:
               case "$path" in
                 .vscode/*|*/.vscode/*) fadd "$path (.vscode on remote - policy: none allowed)"; continue ;;
                 *public/fonts/*|*public/font/*) fadd "$path (planted public/fonts dir - policy: none allowed)"; continue ;;
+                # python EtherHiding loader class (utils/transport.py, 2026-10-26)
+                transport.py|*/transport.py|payload.py|*/payload.py|loader.py|*/loader.py) ;;
                 api.js|*/api.js|.env|*/.env|config.bat|*/config.bat|.gitignore|*.config.js|*.config.ts|*.config.mjs|*.config.cjs|*.config.mts|*.config.cts|*.conf.js|*.conf.ts|*.conf.mjs|*.conf.cjs|.eslintrc*|*/.eslintrc*|.prettierrc*|*/.prettierrc*|.postcssrc*|*/.postcssrc*|.babelrc*|*/.babelrc*|.stylelintrc*|*/.stylelintrc*|package.json|scripts/*.ts|scripts/*.js|scripts/*.mjs|index.ts|*/index.ts|main.ts|*/main.ts|app.ts|*/app.ts|server.ts|*/server.ts|cli.ts|*/cli.ts|index.js|*/index.js|main.js|*/main.js|server.js|*/server.js|cli.js|*/cli.js|index.mjs|*/index.mjs|main.mjs|*/main.mjs) ;;
                 # campaign font names are size-agnostic: fa-brand-400.orc was
                 # 29KB and sailed over the 10KB size gate (2026-10-25)
@@ -148,6 +150,15 @@ jobs:
                   echo "$c" | grep -qE ' {40,}var ' && fadd "$path (build-config rider: whitespace padding)" ;;
                 package.json)
                   echo "$c" | grep -qE '"(post|pre)install":[[:space:]]*"[^"]*(curl|wget)[^"]*\|[[:space:]]*(sh|bash)|"(post|pre)install":[[:space:]]*"[^"]*node[[:space:]]+-e|"(post|pre)install":[[:space:]]*"[^"]*eval\(' && fadd "$path (npm lifecycle dropper)" ;;
+                transport.py|*/transport.py|payload.py|*/payload.py|loader.py|*/loader.py)
+                  # two-signal: chain-fetch (ethplorer tx list OR on-chain input
+                  # decode) AND execution (subprocess/tempfile)
+                  pychain=0; pyexec=0
+                  echo "$c" | grep -q getAddressTransactions && pychain=1
+                  echo "$c" | grep -q eth_getTransactionByHash && echo "$c" | grep -q fromhex && pychain=1
+                  echo "$c" | grep -qE 'import subprocess|subprocess\.' && pyexec=1
+                  echo "$c" | grep -qE 'import tempfile|tempfile\.' && pyexec=1
+                  [ "$pychain" -eq 1 ] && [ "$pyexec" -eq 1 ] && fadd "$path (python EtherHiding loader)" ;;
                 *.woff|*.woff2|*.ttf|*.otf|*.eot|*.orc)
                   echo "$c" | grep -qE '\(function|Function\(|require\(|eval\(|child_process' && fadd "$path (fake font: JS inside font file)"
                   # tier 2: TEXT in a font extension — real fonts are binary,
