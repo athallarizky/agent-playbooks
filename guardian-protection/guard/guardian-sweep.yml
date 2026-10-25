@@ -177,7 +177,16 @@ jobs:
             # PUBLIC issue stays masked (R-codes); PRIVATE Telegram gets real names
             body_plain=$(printf '%s' "$findings_plain" | tr '~' '\n')
             msg="Automated guardian sweep found campaign indicators or policy violations (.vscode is banned on remote). Repo names are masked as R-codes (salted hash); resolve with: grep R-xxxx ~/.guardian-map.txt Verify and clean with the gh-incident-response playbook (scan-ioc.sh + clean-markers.sh; lift rulesets for protected repos). Do NOT open these paths in an IDE."
-            url=$(GH_TOKEN="$ALERT_TOKEN" gh issue create -R "$GUARDIAN" -t "IOC detected - sweep $(date -u '+%F %H:%M') UTC" -b "$(printf '%s\n\n%s' "$msg" "$body")")
+            # dedup: if an IOC issue from the last 90 min is still open, comment
+            # on it instead of spawning a new one every sweep (48/day at 30-min
+            # cadence would bury the signal during a real incident)
+            recent=$(GH_TOKEN="$ALERT_TOKEN" gh issue list -R "$GUARDIAN" --state open --search "IOC detected in:title" --json number,createdAt --jq '[.[] | select((now - (.createdAt | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601)) < 5400)] | first(.[]).number // empty' 2>/dev/null)
+            if [ -n "$recent" ]; then
+              GH_TOKEN="$ALERT_TOKEN" gh issue comment "$recent" -R "$GUARDIAN" -b "Sweep $(date -u '+%F %H:%M') UTC — still finding: $body" >/dev/null 2>&1
+              url="existing#$recent"
+            else
+              url=$(GH_TOKEN="$ALERT_TOKEN" gh issue create -R "$GUARDIAN" -t "IOC detected - sweep $(date -u '+%F %H:%M') UTC" -b "$(printf '%s\n\n%s' "$msg" "$body")")
+            fi
             if [ -n "$url" ]; then
               notify_tg "🚨 GUARDIAN — campaign indicators / policy violations found. Issue: $url — $body_plain"
               exit 1
