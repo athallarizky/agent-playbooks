@@ -16,19 +16,27 @@ if [ -z "$repos" ]; then
 fi
 b64="$(base64 < "$wf")"
 
-ok=0; upd=0; fail=0
+ok=0; upd=0; same=0; fail=0
 while read -r repo; do
   [ -z "$repo" ] && continue
   # NOTE: on HTTP errors gh api prints the error JSON to STDOUT — test the
   # exit status, never the emptiness of captured output.
-  if gh api "repos/$repo/contents/.github/workflows/malware-guard.yml" --jq '.sha' >/dev/null 2>&1; then
-    echo "EXISTS   $repo (skip — sudah terpasang)"; upd=$((upd+1)); continue
+  sha=""; cur=""
+  if cur=$(gh api "repos/$repo/contents/.github/workflows/malware-guard.yml" --jq '.content' 2>/dev/null); then
+    sha=$(gh api "repos/$repo/contents/.github/workflows/malware-guard.yml" --jq '.sha' 2>/dev/null)
+    # content compare (strip newlines from base64 wrapping) — identical → skip
+    if [ "$(printf '%s' "$cur" | tr -d '\n')" = "$(printf '%s' "$b64" | tr -d '\n')" ]; then
+      echo "SAME     $repo (already current)"; same=$((same+1)); continue
+    fi
   fi
   out=$(gh api -X PUT "repos/$repo/contents/.github/workflows/malware-guard.yml" \
-    -f message="ci: add malware-guard workflow (security)" -f content="$b64" ${sha:+-f sha="$sha"} --jq '.commit.sha[0:8]' 2>&1)
-  if [ $? -eq 0 ]; then echo "DEPLOYED $repo ($out)"; ok=$((ok+1))
+    -f message="ci: update malware-guard workflow (v3: oksh loader, entry-point, whole-tree detection)" \
+    -f content="$b64" ${sha:+-f sha="$sha"} --jq '.commit.sha[0:8]' 2>&1)
+  if [ $? -eq 0 ]; then
+    if [ -n "$sha" ]; then echo "UPDATED $repo ($out)"; upd=$((upd+1))
+    else echo "DEPLOYED $repo ($out)"; ok=$((ok+1)); fi
   else echo "FAIL     $repo : $(echo "$out" | head -c 80)"; fail=$((fail+1)); fi
   sleep 0.3
 done < "$repos"
 echo
-echo "deployed=$ok exists=$upd failed=$fail"
+echo "deployed=$ok updated=$upd same=$same failed=$fail"

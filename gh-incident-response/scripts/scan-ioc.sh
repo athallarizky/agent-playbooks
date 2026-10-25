@@ -31,10 +31,13 @@ while read -r repo br; do
   if [ -z "$hits" ]; then echo "OK   $repo @$br"; clean=$((clean+1)); continue; fi
   verdict=""; fetch_fail=0
   for p in $hits; do
+    # paths may contain spaces (macOS "file.js 09-21-22-090.js" duplicates) —
+    # percent-encode them or the contents API 404s and the ref reads as ERR
+    ep="${p// /%20}"
     # A failed content fetch (rate-limit, network) must NEVER yield a "clean"
     # verdict from partial data — 2026-10-20: throttled runs reported 134
     # infected refs as 18 then 0 because failures silently became "" content.
-    if ! content=$(gh api "repos/$repo/contents/$p?ref=$br" --jq '.content' 2>/dev/null | base64 -d 2>/dev/null); then
+    if ! content=$(gh api "repos/$repo/contents/$ep?ref=$br" --jq '.content' 2>/dev/null | base64 -d 2>/dev/null); then
       fetch_fail=1; continue
     fi
     if printf '%s' "$content" | ioc_path_is_malicious "$p"; then verdict="$verdict MALICIOUS:$p"; fi

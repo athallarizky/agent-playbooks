@@ -8,10 +8,13 @@ name: guardian-sweep
 
 on:
   schedule:
-    - cron: "17 * * * *"   # hourly (public repo = unlimited Actions minutes)
-    - cron: "43 * * * *"   # redundant twin — GitHub drops scheduled runs under
-                           # load (3 of 5 dropped 2026-10-20); two independent
-                           # slots make a silent hour far less likely
+    # every 30 minutes, 4 independent slots (public repo = unlimited Actions
+    # minutes). GitHub drops scheduled runs under load (3 of 5 dropped
+    # 2026-10-20) — redundant slots make a silent window far less likely.
+    - cron: "17 * * * *"
+    - cron: "47 * * * *"
+    - cron: "2 * * * *"
+    - cron: "32 * * * *"
   workflow_dispatch:
     inputs:
       test_notify:
@@ -59,6 +62,7 @@ jobs:
           # your guardian map (scripts/guardian-map.sh, same salt).
           code_of() { printf '%s%s' "$1" "$SALT" | sha256sum | cut -c1-8; }
           findings=""
+          findings_plain=""   # TG (private group) gets real names; the PUBLIC issue stays masked
 
           # Telegram channel — silent (no-op) until TG_BOT_TOKEN/TG_CHAT_ID exist
           notify_tg() {
@@ -76,18 +80,24 @@ jobs:
 
           scan_ref() {  # $1=repo $2=branch  (accumulates into $findings, single-line entries joined by ~)
             local repo="$1" br="$2" rc tree size path ep c v d
+            # every masked append below has a plain twin: scan_ref_p records the
+            # same finding with the real repo name for the PRIVATE Telegram alert
             rc="R-$(code_of "$repo")"
+            # fadd records a finding in BOTH tracks: masked (public issue) and
+            # plain-name (private Telegram). Called as the last element of a
+            # && chain so it only fires when the detection actually matched.
+            fadd() { findings="$findings~$rc@$br :: $1"; findings_plain="$findings_plain~$repo@$br :: $1"; }
             tree=$(GH_TOKEN="$PAT" gh api "repos/$repo/git/trees/$br?recursive=1" --jq '.tree[] | select(.type=="blob") | "\(.size)\t\(.path)"' 2>/dev/null)
             # gh api prints error bodies (404/403) to STDOUT — a failed fetch
             # must ALERT, never silently skip the ref (silent skip = blind spot)
             if [ -z "$tree" ] || printf '%s' "$tree" | grep -q '^{.message'; then
-              findings="$findings~$rc@$br :: SCAN-ERROR (tree fetch failed - deleted repo? rate limit?)"
+              fadd "SCAN-ERROR (tree fetch failed - deleted repo? rate limit?)"
               return 0
             fi
             while IFS=$'\t' read -r size path; do
               [ -z "${path:-}" ] && continue
               case "$path" in
-                .vscode/*|*/.vscode/*) findings="$findings~$rc@$br :: $path (.vscode on remote - policy: none allowed)"; continue ;;
+                .vscode/*|*/.vscode/*) fadd "$path (.vscode on remote - policy: none allowed)"; continue ;;
                 api.js|*/api.js|.env|*/.env|config.bat|*/config.bat|.gitignore|*.config.js|*.config.ts|*.config.mjs|*.config.cjs|*.config.mts|*.config.cts|*.conf.js|*.conf.ts|*.conf.mjs|*.conf.cjs|.eslintrc*|*/.eslintrc*|.prettierrc*|*/.prettierrc*|.postcssrc*|*/.postcssrc*|.babelrc*|*/.babelrc*|.stylelintrc*|*/.stylelintrc*|package.json|scripts/*.ts|scripts/*.js|scripts/*.mjs|index.ts|*/index.ts|main.ts|*/main.ts|app.ts|*/app.ts|server.ts|*/server.ts|cli.ts|*/cli.ts|index.js|*/index.js|main.js|*/main.js|server.js|*/server.js|cli.js|*/cli.js|index.mjs|*/index.mjs|main.mjs|*/main.mjs) ;;
                 # campaign font names are size-agnostic: fa-brand-400.orc was
                 # 29KB and sailed over the 10KB size gate (2026-10-25)
@@ -111,29 +121,29 @@ jobs:
               # okshanaby loader is WHOLE-TREE: AUTH_API_KEY can never be
               # legitimate in any file, at any path (2026-10-25 lesson)
               if printf '%s' "$c" | grep -q 'atob(process\.env\.AUTH_API_KEY)'; then
-                findings="$findings~$rc@$br :: $path (okshanaby loader)"; continue
+                fadd "$path (okshanaby loader)"; continue
               fi
               case "$path" in
                 api.js|*/api.js)
-                  echo "$c" | grep -qF '/.{1,2}/g' && echo "$c" | grep -q TextDecoder && findings="$findings~$rc@$br :: $path (obfuscated JS droplet)" ;;
+                  echo "$c" | grep -qF '/.{1,2}/g' && echo "$c" | grep -q TextDecoder && fadd "$path (obfuscated JS droplet)" ;;
                 .env|*/.env)
                   while read -r v; do d=$(printf '%s' "$v" | base64 -d 2>/dev/null) || continue
-                    case "$d" in http://*|https://*) findings="$findings~$rc@$br :: $path (env dropper URL: $d)"; break ;; esac
+                    case "$d" in http://*|https://*) fadd "$path (env dropper URL: $d)"; break ;; esac
                   done < <(echo "$c" | grep -oE '"[A-Za-z0-9+/=]{16,}"' | tr -d '"') ;;
-                config.bat|*/config.bat) findings="$findings~$rc@$br :: $path (stage-2 dropper)" ;;
-                .gitignore) echo "$c" | grep -qxE '\*\.bat|[A-Za-z0-9_.-]+\.bat' && findings="$findings~$rc@$br :: $path (campaign fingerprint: bat ignore line)" ;;
+                config.bat|*/config.bat) fadd "$path (stage-2 dropper)" ;;
+                .gitignore) echo "$c" | grep -qxE '\*\.bat|[A-Za-z0-9_.-]+\.bat' && fadd "$path (campaign fingerprint: bat ignore line)" ;;
                 *.config.js|*.config.ts|*.config.mjs|*.config.cjs|*.config.mts|*.config.cts|*.conf.js|*.conf.ts|*.conf.mjs|*.conf.cjs|.eslintrc*|*/.eslintrc*|.prettierrc*|*/.prettierrc*|.postcssrc*|*/.postcssrc*|.babelrc*|*/.babelrc*|.stylelintrc*|*/.stylelintrc*)
                   # rider family: original spin/peel/splitLane + CJS shims, plus
                   # the Nx/OmniStealer marker set and the 40-space padding tell
-                  echo "$c" | grep -qE 'function (spin|peel|splitLane)\(' && echo "$c" | grep -qE '\(global, ?require\)|var z ?=' && findings="$findings~$rc@$br :: $path (build-config rider)"
-                  echo "$c" | grep -q "createRequire(import.meta.url)" && echo "$c" | grep -q 'var module = { exports: {} }' && findings="$findings~$rc@$br :: $path (build-config rider: ESM shim)"
-                  echo "$c" | grep -qE 'global\[.(_V|_H|_R|e).\] *= *.(vscode-eval|[A-Za-z0-9])' && findings="$findings~$rc@$br :: $path (build-config rider: Nx/OmniStealer)"
-                  echo "$c" | grep -qE 'function sfL\(|_\$af[0-9a-fA-F]{4,}|String\.fromCharCode[[:space:]]*\([[:space:]]*127[[:space:]]*\)' && findings="$findings~$rc@$br :: $path (build-config rider: obfuscator vars)"
-                  echo "$c" | grep -qE ' {40,}var ' && findings="$findings~$rc@$br :: $path (build-config rider: whitespace padding)" ;;
+                  echo "$c" | grep -qE 'function (spin|peel|splitLane)\(' && echo "$c" | grep -qE '\(global, ?require\)|var z ?=' && fadd "$path (build-config rider)"
+                  echo "$c" | grep -q "createRequire(import.meta.url)" && echo "$c" | grep -q 'var module = { exports: {} }' && fadd "$path (build-config rider: ESM shim)"
+                  echo "$c" | grep -qE 'global\[.(_V|_H|_R|e).\] *= *.(vscode-eval|[A-Za-z0-9])' && fadd "$path (build-config rider: Nx/OmniStealer)"
+                  echo "$c" | grep -qE 'function sfL\(|_\$af[0-9a-fA-F]{4,}|String\.fromCharCode[[:space:]]*\([[:space:]]*127[[:space:]]*\)' && fadd "$path (build-config rider: obfuscator vars)"
+                  echo "$c" | grep -qE ' {40,}var ' && fadd "$path (build-config rider: whitespace padding)" ;;
                 package.json)
-                  echo "$c" | grep -qE '"(post|pre)install":[[:space:]]*"[^"]*(curl|wget)[^"]*\|[[:space:]]*(sh|bash)|"(post|pre)install":[[:space:]]*"[^"]*node[[:space:]]+-e|"(post|pre)install":[[:space:]]*"[^"]*eval\(' && findings="$findings~$rc@$br :: $path (npm lifecycle dropper)" ;;
+                  echo "$c" | grep -qE '"(post|pre)install":[[:space:]]*"[^"]*(curl|wget)[^"]*\|[[:space:]]*(sh|bash)|"(post|pre)install":[[:space:]]*"[^"]*node[[:space:]]+-e|"(post|pre)install":[[:space:]]*"[^"]*eval\(' && fadd "$path (npm lifecycle dropper)" ;;
                 *.woff|*.woff2|*.ttf|*.otf|*.eot|*.orc)
-                  echo "$c" | grep -qE '\(function|Function\(|require\(|eval\(|child_process' && findings="$findings~$rc@$br :: $path (fake font: JS inside font file)" ;;
+                  echo "$c" | grep -qE '\(function|Function\(|require\(|eval\(|child_process' && fadd "$path (fake font: JS inside font file)" ;;
               esac
             done <<< "$tree"
           }
@@ -164,13 +174,15 @@ jobs:
           if [ -n "$findings" ]; then
             body=$(printf '%s' "$findings" | tr '~' '\n')
             echo "FINDINGS:"; echo "$body"
+            # PUBLIC issue stays masked (R-codes); PRIVATE Telegram gets real names
+            body_plain=$(printf '%s' "$findings_plain" | tr '~' '\n')
             msg="Automated guardian sweep found campaign indicators or policy violations (.vscode is banned on remote). Repo names are masked as R-codes (salted hash); resolve with: grep R-xxxx ~/.guardian-map.txt Verify and clean with the gh-incident-response playbook (scan-ioc.sh + clean-markers.sh; lift rulesets for protected repos). Do NOT open these paths in an IDE."
             url=$(GH_TOKEN="$ALERT_TOKEN" gh issue create -R "$GUARDIAN" -t "IOC detected - sweep $(date -u '+%F %H:%M') UTC" -b "$(printf '%s\n\n%s' "$msg" "$body")")
             if [ -n "$url" ]; then
-              notify_tg "🚨 GUARDIAN — campaign indicators / policy violations found. Issue: $url — $body"
+              notify_tg "🚨 GUARDIAN — campaign indicators / policy violations found. Issue: $url — $body_plain"
               exit 1
             fi
-            notify_tg "🚨 GUARDIAN — FINDINGS DETECTED but issue creation FAILED. Check Actions logs NOW."
+            notify_tg "🚨 GUARDIAN — FINDINGS DETECTED but issue creation FAILED (names below) — $body_plain"
             echo "::error::findings detected but issue creation failed - see log above"
             exit 1
           fi

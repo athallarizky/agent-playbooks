@@ -17,17 +17,21 @@ if [ -z "$repos" ]; then
   gh api --paginate "user/repos?type=owner&per_page=100" --jq '.[] | select(.fork == false) | .full_name' > "$repos"
 fi
 
-ok=0; fail=0
+ok=0; have=0; fail=0
 while read -r repo; do
   [ -z "$repo" ] && continue
+  # idempotent: skip if an active ruleset named malware-guard already exists
+  if gh api "repos/$repo/rulesets" --jq '.[] | select(.name == "malware-guard") | .id' 2>/dev/null | grep -q .; then
+    echo "EXISTS    $repo (malware-guard already active)"; have=$((have+1)); continue
+  fi
   body=$(mktemp)
   cat > "$body" <<'JSON'
 {
   "name": "malware-guard",
   "target": "branch",
   "enforcement": "active",
-  "conditions": { "ref_name": { "include": ["**"], "exclude": [] } },
-  "rules": [ { "type": "required_signatures" }, { "type": "non_fast_forward" } ]
+  "conditions": { "ref_name": { "include": ["~ALL"], "exclude": [] } },
+  "rules": [ { "type": "required_signatures" }, { "type": "non_fast_forward" }, { "type": "deletion" } ]
 }
 JSON
   out=$(gh api -X POST "repos/$repo/rulesets" --input "$body" --jq '.id' 2>&1)
@@ -36,4 +40,4 @@ JSON
   rm -f "$body"
 done < "$repos"
 echo
-echo "protected=$ok failed=$fail (private repos on Free plan cannot have rulesets)"
+echo "protected=$ok exists=$have failed=$fail (private repos on Free plan cannot have rulesets)"

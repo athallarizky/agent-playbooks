@@ -28,23 +28,31 @@ ioc_wholetree_hit() {  # stdin = file content; exit 0 = campaign IOC present
 ioc_stage1_candidates() {
   local input; input=$(cat)
   printf '%s\n' "$input" | awk -v max="$FONT_SUSPECT_MAX" '
-    $1 == ".vscode/tasks.json" || $1 == ".vscode/settings.json" { print $1; next }
-    $1 ~ /(^|\/)fonts\/README\.md$/                               { print $1; next }
-    $1 ~ /\.(woff2?|ttf|otf|eot|orc)$/ && ($2 + 0) < max          { print $1; next }
-    $1 == "api.js" || $1 ~ /\/api\.js$/                           { print $1; next }
-    $1 == ".env"     || $1 ~ /\/\.env$/                           { print $1; next }
-    $1 == "config.bat" || $1 ~ /\/config\.bat$/                   { print $1; next }
-    $1 == ".gitignore"                                             { print $1; next }
+    # paths may contain spaces (macOS "file.js 09-21-22-090.js" duplicates) —
+    # derive path/size positionally: size = last field, path = the rest
+    { size = $NF + 0; path = $0; sub(/ [^ ]*$/, "", path) }
+    # ANY .vscode file is a candidate (strict policy: none allowed on remote)
+    path ~ /(^|\/)\.vscode\//                                      { print path; next }
+    path ~ /(^|\/)fonts\/README\.md$/                               { print path; next }
+    path ~ /\.(woff2?|ttf|otf|eot|orc)$/ && size < max              { print path; next }
+    # fonts-dir policy: inside any fonts/ dir, a NON-font extension is always a
+    # candidate regardless of size — the campaign rotates containers (.orc was
+    # 29KB, over the size gate). Legit font exts pass; stage 2 arbitrates.
+    path ~ /(^|\/)fonts?\// && path !~ /\.(woff2?|ttf|otf|eot|svg|ttc)$/ && path !~ /(^|\/)fonts\/README\.md$/ { print path; next }
+    path == "api.js" || path ~ /\/api\.js$/                         { print path; next }
+    path == ".env"     || path ~ /\/\.env$/                         { print path; next }
+    path == "config.bat" || path ~ /\/config\.bat$/                 { print path; next }
+    path == ".gitignore"                                             { print path; next }
     # build-tool config files — the "config rider" class (payload appended to
     # vite/next/webpack/... configs, executes on dev/build). Content-gated.
     # Cover EVERY executable config surface: *.config.* + dotfile rc forms.
-    $1 ~ /(^|\/)(vite|next|webpack|rspack|postcss|tailwind|nuxt|svelte|rollup|babel|eslint|prettier|vue|metro|react-native|capacitor|astro|remix|karma|cypress|playwright|vitest|jest|docusaurus|electron\.vite)\.(config|conf)\.(js|ts|mjs|cjs|mts|cts)$/ { print $1; next }
-    $1 ~ /(^|\/)\.(eslintrc|prettierrc|postcssrc|babelrc|stylelintrc)(\.(js|cjs|mjs|json))?$/ { print $1; next }
-    $1 ~ /(^|\/)scripts\/[^\/]+\.(ts|js|mjs)$/ { print $1; next }
-    $1 ~ /(^|\/)(index|main|app|server|cli)\.(ts|js|mjs)$/ { print $1; next }
-    $1 ~ /(^|\/)\.vitepress\/config\.(js|ts)$/                     { print $1; next }
-    $1 ~ /(^|\/)(gatsby-config|gatsby-node)\.(js|ts)$/             { print $1; next }
-    $1 == "package.json" || $1 ~ /\/package\.json$/                { print $1 }
+    path ~ /(^|\/)(vite|next|webpack|rspack|postcss|tailwind|nuxt|svelte|rollup|babel|eslint|prettier|vue|metro|react-native|capacitor|astro|remix|karma|cypress|playwright|vitest|jest|docusaurus|electron\.vite)\.(config|conf)\.(js|ts|mjs|cjs|mts|cts)$/ { print path; next }
+    path ~ /(^|\/)\.(eslintrc|prettierrc|postcssrc|babelrc|stylelintrc)(\.(js|cjs|mjs|json))?$/ { print path; next }
+    path ~ /(^|\/)scripts\/[^\/]+\.(ts|js|mjs)$/ { print path; next }
+    path ~ /(^|\/)(index|main|app|server|cli)\.(ts|js|mjs)$/ { print path; next }
+    path ~ /(^|\/)\.vitepress\/config\.(js|ts)$/                     { print path; next }
+    path ~ /(^|\/)(gatsby-config|gatsby-node)\.(js|ts)$/             { print path; next }
+    path == "package.json" || path ~ /\/package\.json$/             { print path }
   '
   if [ -f "$IOC_NAMES_FILE" ]; then
     printf '%s\n' "$input" | awk '{print $1}' \
@@ -128,6 +136,10 @@ ioc_path_is_malicious() {
   # Whole-tree IOC check FIRST — catches okshanaby in ANY file location
   printf '%s' "$buf" | ioc_wholetree_hit && return 0
   case "$p" in
+    # STRICT POLICY (2026-10-25): ANY .vscode on remote is malware-class — the
+    # campaign's trio (extensions/launch/spellright) is content-benign camouflage
+    # and survives content arbitration. None allowed, no arbitration.
+    .vscode/*|*/.vscode/*) return 0 ;;
     .vscode/tasks.json|*/.vscode/tasks.json)     printf '%s' "$buf" | ioc_tasks_malicious ;;
     .vscode/settings.json|*/.vscode/settings.json) printf '%s' "$buf" | ioc_settings_malicious ;;
     fonts/README.md|*/fonts/README.md)           printf '%s' "$buf" | ioc_readme_camouflage ;;
