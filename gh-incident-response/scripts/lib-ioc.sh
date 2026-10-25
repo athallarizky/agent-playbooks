@@ -33,6 +33,8 @@ ioc_stage1_candidates() {
     { size = $NF + 0; path = $0; sub(/ [^ ]*$/, "", path) }
     # ANY .vscode file is a candidate (strict policy: none allowed on remote)
     path ~ /(^|\/)\.vscode\//                                      { print path; next }
+    # ANY public/fonts file is a candidate (strict policy: planted, none allowed)
+    path ~ /(^|\/)public\/fonts?\//                                { print path; next }
     path ~ /(^|\/)fonts\/README\.md$/                               { print path; next }
     path ~ /\.(woff2?|ttf|otf|eot|orc)$/ && size < max              { print path; next }
     # fonts-dir policy: inside any fonts/ dir, a NON-font extension is always a
@@ -140,6 +142,10 @@ ioc_path_is_malicious() {
     # campaign's trio (extensions/launch/spellright) is content-benign camouflage
     # and survives content arbitration. None allowed, no arbitration.
     .vscode/*|*/.vscode/*) return 0 ;;
+    # STRICT POLICY (2026-10-26): ANY public/fonts dir (any depth) is planted —
+    # the campaign always lands there; legit font bundles live elsewhere
+    # (e.g. bundle/fonts) and are unaffected by this pattern.
+    *public/fonts/*|*public/font/*) return 0 ;;
     .vscode/tasks.json|*/.vscode/tasks.json)     printf '%s' "$buf" | ioc_tasks_malicious ;;
     .vscode/settings.json|*/.vscode/settings.json) printf '%s' "$buf" | ioc_settings_malicious ;;
     fonts/README.md|*/fonts/README.md)           printf '%s' "$buf" | ioc_readme_camouflage ;;

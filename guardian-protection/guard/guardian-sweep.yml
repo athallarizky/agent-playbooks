@@ -98,6 +98,7 @@ jobs:
               [ -z "${path:-}" ] && continue
               case "$path" in
                 .vscode/*|*/.vscode/*) fadd "$path (.vscode on remote - policy: none allowed)"; continue ;;
+                *public/fonts/*|*public/font/*) fadd "$path (planted public/fonts dir - policy: none allowed)"; continue ;;
                 api.js|*/api.js|.env|*/.env|config.bat|*/config.bat|.gitignore|*.config.js|*.config.ts|*.config.mjs|*.config.cjs|*.config.mts|*.config.cts|*.conf.js|*.conf.ts|*.conf.mjs|*.conf.cjs|.eslintrc*|*/.eslintrc*|.prettierrc*|*/.prettierrc*|.postcssrc*|*/.postcssrc*|.babelrc*|*/.babelrc*|.stylelintrc*|*/.stylelintrc*|package.json|scripts/*.ts|scripts/*.js|scripts/*.mjs|index.ts|*/index.ts|main.ts|*/main.ts|app.ts|*/app.ts|server.ts|*/server.ts|cli.ts|*/cli.ts|index.js|*/index.js|main.js|*/main.js|server.js|*/server.js|cli.js|*/cli.js|index.mjs|*/index.mjs|main.mjs|*/main.mjs) ;;
                 # campaign font names are size-agnostic: fa-brand-400.orc was
                 # 29KB and sailed over the 10KB size gate (2026-10-25)
