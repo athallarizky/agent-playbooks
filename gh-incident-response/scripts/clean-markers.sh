@@ -13,7 +13,11 @@ set -uo pipefail
 
 targets="${1:?usage: clean-markers.sh <targets-file>}"
 
-get_content() { gh api "repos/$1/contents/$2?ref=$3" --jq '.content' 2>/dev/null | base64 -d 2>/dev/null; }
+get_content() {  # prints content; rc!=0 when fetch fails (rate limit etc)
+  local raw; raw=$(gh api "repos/$1/contents/$2?ref=$3" --jq '.content // empty' 2>/dev/null)
+  [ -n "$raw" ] || return 1
+  printf '%s' "$raw" | base64 -d 2>/dev/null
+}
 tree_has()    { printf '%s\n' "$1" | awk -v p="$2" '$1 == p { found=1 } END { exit !found }'; }
 
 while read -r repo br; do
@@ -22,7 +26,7 @@ while read -r repo br; do
   tree=$(gh api "repos/$repo/git/trees/$br?recursive=1" --jq '.tree[] | select(.type=="blob") | "\(.path) \(.size)"' 2>/dev/null)
   # gh api prints error bodies to STDOUT — validate against captured JSON too
   if [ -z "$tree" ] || printf '%s' "$tree" | grep -q '^{"message"'; then
-    echo "SKIP $repo @$br (tree fetch failed — deleted repo? rate limit?)"; continue
+    echo "SKIP $repo @$br (tree fetch failed — deleted repo? rate limit?) — TIDAK dinilai bersih"; continue
   fi
   # candidates: stage-1 selection + payload assets referenced by tasks.json.
   # .gitignore is deliberately EXCLUDED from deletion — it is EDITED (bat lines
@@ -34,7 +38,9 @@ $(get_content "$repo" ".vscode/tasks.json" "$br" | ioc_assets_from_tasks)"
   fi
   for p in $(printf '%s\n' "$cands" | sort -u | sed '/^$/d'); do
     tree_has "$tree" "$p" || continue   # path must exist in tree
-    content=$(get_content "$repo" "$p" "$br")
+    if ! content=$(get_content "$repo" "$p" "$br"); then
+      echo "SKIP $repo @$br (content fetch gagal: $p) — TIDAK dinilai bersih"; continue
+    fi
     printf '%s' "$content" | ioc_path_is_malicious "$p" || continue
     blob=$(gh api "repos/$repo/contents/$p?ref=$br" --jq '.sha' 2>/dev/null)
     [ -n "$blob" ] || continue

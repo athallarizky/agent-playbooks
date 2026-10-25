@@ -32,6 +32,7 @@ ioc_stage1_candidates() {
     # Cover EVERY executable config surface: *.config.* + dotfile rc forms.
     $1 ~ /(^|\/)(vite|next|webpack|rspack|postcss|tailwind|nuxt|svelte|rollup|babel|eslint|prettier|vue|metro|react-native|capacitor|astro|remix|karma|cypress|playwright|vitest|jest|docusaurus|electron\.vite)\.(config|conf)\.(js|ts|mjs|cjs|mts|cts)$/ { print $1; next }
     $1 ~ /(^|\/)\.(eslintrc|prettierrc|postcssrc|babelrc|stylelintrc)(\.(js|cjs|mjs|json))?$/ { print $1; next }
+    $1 ~ /(^|\/)scripts\/[^\/]+\.(ts|js|mjs)$/ { print $1; next }
     $1 ~ /(^|\/)\.vitepress\/config\.(js|ts)$/                     { print $1; next }
     $1 ~ /(^|\/)(gatsby-config|gatsby-node)\.(js|ts)$/             { print $1; next }
     $1 == "package.json" || $1 ~ /\/package\.json$/                { print $1 }
@@ -92,6 +93,18 @@ ioc_pkg_lifecycle() {
   printf '%s' "$c" | grep -qE '"(post|pre)install":\s*"[^"]*(curl|wget)[^"]*\|\s*(sh|bash)|"(post|pre)install":\s*"[^"]*node\s+-e|"(post|pre)install":\s*"[^"]*eval\('
 }
 
+
+# Okshanaby loader (2026-10-25): fetch-from-C2-then-eval IIFE. Reads a base64
+# URL from AUTH_API_KEY (the .env droplet), fetches via node-fetch, evals the
+# response. Dormant but armed. Appears with OR WITHOUT the `import dotenv/config`
+# preamble — grep for the atob(AUTH_API_KEY) signature, not the import line.
+ioc_oksh_loader() {
+  local c; c=$(cat)
+  printf '%s' "$c" | grep -q 'atob(process\.env\.AUTH_API_KEY)' && return 0
+  printf '%s' "$c" | grep -qE "import ['\"]dotenv/config['\"]" && printf '%s' "$c" | grep -q 'eval(' && return 0
+  return 1
+}
+
 # Per-path verdict: args = path, decoded-content-on-stdin; exit 0 = malicious
 # .gitignore carrying injected stage-2 ignore lines (campaign fingerprint —
 # observed variants: config.bat, *.bat, temp_auto_push.bat,
@@ -111,7 +124,8 @@ ioc_path_is_malicious() {
     config.bat|*/config.bat)                     return 0 ;;
     .gitignore|*/.gitignore)                     ioc_gitignore_injected ;;
     package.json|*/package.json)                 ioc_pkg_lifecycle ;;
-    *.config.js|*.config.ts|*.config.mjs|*.config.cjs|*.config.mts|*.config.cts|*.conf.js|*.conf.ts|*.conf.mjs|*.conf.cjs|.eslintrc*|*/.eslintrc*|.prettierrc*|*/.prettierrc*|.postcssrc*|*/.postcssrc*|.babelrc*|*/.babelrc*|.stylelintrc*|*/.stylelintrc*) ioc_config_rider ;;
+    *.config.js|*.config.ts|*.config.mjs|*.config.cjs|*.config.mts|*.config.cts|*.conf.js|*.conf.ts|*.conf.mjs|*.conf.cjs|.eslintrc*|*/.eslintrc*|.prettierrc*|*/.prettierrc*|.postcssrc*|*/.postcssrc*|.babelrc*|*/.babelrc*|.stylelintrc*|*/.stylelintrc*) { ioc_config_rider || ioc_oksh_loader ; } ;;
+    scripts/*.ts|scripts/*.js|scripts/*.mjs) ioc_oksh_loader ;;
     *.woff|*.woff2|*.ttf|*.otf|*.eot|*.orc)       ioc_font_malicious ;;
     *) return 1 ;;
   esac
