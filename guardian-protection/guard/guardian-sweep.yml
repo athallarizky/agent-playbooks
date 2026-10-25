@@ -22,7 +22,7 @@ on:
         type: boolean
         default: false
       orgs:
-        description: "Orgs manual (spasi-pisah) — kosong = default (personal + The-Aetheris). Contoh: gaspack-launchpad 2pai-dev 2PAI-TEN"
+        description: "Orgs manual (spasi-pisah) — kosong = default (personal + The-Aetheris); all = semua org kecuali kitabisa. Contoh: gaspack-launchpad 2pai-dev 2PAI-TEN"
         type: string
         default: ""
 
@@ -149,7 +149,11 @@ jobs:
                 package.json)
                   echo "$c" | grep -qE '"(post|pre)install":[[:space:]]*"[^"]*(curl|wget)[^"]*\|[[:space:]]*(sh|bash)|"(post|pre)install":[[:space:]]*"[^"]*node[[:space:]]+-e|"(post|pre)install":[[:space:]]*"[^"]*eval\(' && fadd "$path (npm lifecycle dropper)" ;;
                 *.woff|*.woff2|*.ttf|*.otf|*.eot|*.orc)
-                  echo "$c" | grep -qE '\(function|Function\(|require\(|eval\(|child_process' && fadd "$path (fake font: JS inside font file)" ;;
+                  echo "$c" | grep -qE '\(function|Function\(|require\(|eval\(|child_process' && fadd "$path (fake font: JS inside font file)"
+                  # tier 2: TEXT in a font extension — real fonts are binary,
+                  # payloads are printable text; catches keyword-stripped payloads
+                  r=$(printf '%s' "$c" | head -c 2048 | LC_ALL=C tr -d '[:print:]\t\r\n' | wc -c)
+                  [ "${r// /}" -eq 0 ] && fadd "$path (fake font: text payload, no binary bytes)" ;;
               esac
             done <<< "$tree"
           }
@@ -160,7 +164,8 @@ jobs:
           if [ -n "${ORGS_INPUT:-}" ]; then ACTIVE_ORGS="$ORGS_INPUT"; fi
           targets=$(GH_TOKEN="$PAT" gh api --paginate "user/repos?type=owner&per_page=100" --jq '.[] | select(.fork == false) | .full_name' 2>/dev/null) || targets=""
           if [ "$ACTIVE_ORGS" = "all" ]; then
-            ACTIVE_ORGS=$(GH_TOKEN="$PAT" gh api "user/orgs?per_page=100" --jq '[.[].login] | join(" ")' 2>/dev/null)
+            # kitabisa is excluded: maintained by its own team, out of scope here
+            ACTIVE_ORGS=$(GH_TOKEN="$PAT" gh api "user/orgs?per_page=100" --jq '[.[].login | select(. != "kitabisa")] | join(" ")' 2>/dev/null)
           fi
           echo "scope: personal + ${ACTIVE_ORGS:-none}"
           for org in $ACTIVE_ORGS; do

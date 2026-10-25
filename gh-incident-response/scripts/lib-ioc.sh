@@ -72,7 +72,20 @@ ioc_name_blacklisted() {  # path in $1; exit 0 = known-bad name
 # reading the same stdin is unreliable (the first grep drains the pipe).
 ioc_tasks_malicious()   { local c; c=$(cat); printf '%s' "$c" | grep -q 'folderOpen' && printf '%s' "$c" | grep -qE '(node|python|perl|ruby|bash|sh|powershell) ' && printf '%s' "$c" | grep -qE '\.(woff2?|ttf|otf|eot|orc|svg)'; }
 ioc_settings_malicious(){ grep -q '"task.allowAutomaticTasks"[[:space:]]*:[[:space:]]*true'; }
-ioc_font_malicious()    { grep -qE '\(function|Function\(|require\(|eval\(|child_process'; }
+ioc_font_malicious() {  # $1 optional path — needed for the printability tier
+  local c; c=$(cat)
+  # tier 1: JS tokens inside a font asset (obfuscated payloads still expose these)
+  printf '%s' "$c" | grep -qE '\(function|Function\(|require\(|eval\(|child_process' && return 0
+  # tier 2: TEXT-in-font-extension — real font binaries (woff2/ttf/otf/ttc/eot)
+  # always carry non-printable bytes (magic headers, nulls, tables); a payload
+  # is printable text. Keyword-independent: survives obfuscation rotation.
+  # .svg is EXEMPT — SVG fonts are legitimately XML text.
+  case "${1:-}" in *.svg) return 1 ;; esac
+  local residue
+  residue=$(printf '%s' "$c" | head -c 2048 | LC_ALL=C tr -d '[:print:]\t\r\n' | wc -c | tr -d ' ')
+  [ -n "$c" ] && [ "$residue" -eq 0 ] && return 0
+  return 1
+}
 ioc_readme_camouflage() { grep -q 'Blockchain Explorer'; }
 # Obfuscated JS droplet (api.js class): XOR-hex decoder signature of the
 # campaign obfuscator — tight on purpose so legit CommonJS (`require(`) passes.
@@ -158,7 +171,7 @@ ioc_path_is_malicious() {
       printf '%s' "$buf" | ioc_config_rider && return 0
       printf '%s' "$buf" | ioc_oksh_loader ;;
     scripts/*.ts|scripts/*.js|scripts/*.mjs)      printf '%s' "$buf" | ioc_oksh_loader ;;
-    *.woff|*.woff2|*.ttf|*.otf|*.eot|*.orc)       printf '%s' "$buf" | ioc_font_malicious ;;
+    *.woff|*.woff2|*.ttf|*.otf|*.eot|*.orc)       printf '%s' "$buf" | ioc_font_malicious "$p" ;;
     *) return 1 ;;
   esac
 }
