@@ -9,7 +9,15 @@ name: guardian-sweep
 on:
   schedule:
     - cron: "17 * * * *"   # hourly (public repo = unlimited Actions minutes)
+    - cron: "43 * * * *"   # redundant twin — GitHub drops scheduled runs under
+                           # load (3 of 5 dropped 2026-10-20); two independent
+                           # slots make a silent hour far less likely
   workflow_dispatch:
+    inputs:
+      test_notify:
+        description: "Kirim test notifikasi Telegram lalu berhenti (uji kanal)"
+        type: boolean
+        default: false
 
 permissions:
   issues: write   # alerting only; no repo contents are ever modified
@@ -31,6 +39,10 @@ jobs:
           SALT: ${{ secrets.GUARD_SALT }}
           ALERT_TOKEN: ${{ github.token }}
           GUARDIAN: ${{ github.repository }}
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+          TG_THREAD_ID: ${{ secrets.TG_THREAD_ID }}
+          TEST_NOTIFY: ${{ github.event.inputs.test_notify }}
         run: |
           set -u
           set +e   # the runner invokes bash -e; this script handles errors explicitly
@@ -48,24 +60,40 @@ jobs:
           code_of() { printf '%s%s' "$1" "$SALT" | sha256sum | cut -c1-8; }
           findings=""
 
+          # Telegram channel — silent (no-op) until TG_BOT_TOKEN/TG_CHAT_ID exist
+          notify_tg() {
+            [ -z "${TG_BOT_TOKEN:-}" ] || [ -z "${TG_CHAT_ID:-}" ] && return 0
+            local t="$1"; [ ${#t} -gt 3500 ] && t="${t:0:3500} …(truncated - full list in the issue)"
+            local args=(-s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" -d chat_id="${TG_CHAT_ID}" -d text="$t" --max-time 20)
+            [ -n "${TG_THREAD_ID:-}" ] && args+=(-d message_thread_id="${TG_THREAD_ID}")
+            curl "${args[@]}" >/dev/null || true
+          }
+          if [ "${TEST_NOTIFY:-false}" = "true" ]; then
+            notify_tg "✅ guardian test notification — kanal OK ($(date -u '+%F %T') UTC)"
+            echo "test notification sent (or skipped: secrets empty)."
+            exit 0
+          fi
+
           scan_ref() {  # $1=repo $2=branch  (accumulates into $findings, single-line entries joined by ~)
             local repo="$1" br="$2" rc tree size path c v d
             rc="R-$(code_of "$repo")"
-            tree=$(GH_TOKEN="$PAT" gh api "repos/$repo/git/trees/$br?recursive=1" --jq '.tree[] | select(.type=="blob") | "\(.size)\t\(.path)"' 2>/dev/null) || return 0
+            tree=$(GH_TOKEN="$PAT" gh api "repos/$repo/git/trees/$br?recursive=1" --jq '.tree[] | select(.type=="blob") | "\(.size)\t\(.path)"' 2>/dev/null)
+            # gh api prints error bodies (404/403) to STDOUT — a failed fetch
+            # must ALERT, never silently skip the ref (silent skip = blind spot)
+            if [ -z "$tree" ] || printf '%s' "$tree" | grep -q '^{.message'; then
+              findings="$findings~$rc@$br :: SCAN-ERROR (tree fetch failed - deleted repo? rate limit?)"
+              return 0
+            fi
             while IFS=$'\t' read -r size path; do
               [ -z "${path:-}" ] && continue
               case "$path" in
-                .vscode/tasks.json|*/.vscode/tasks.json|.vscode/settings.json|*/.vscode/settings.json) ;;
-                api.js|*/api.js|.env|*/.env|config.bat|*/config.bat|.gitignore|*.config.js|*.config.ts|*.config.mjs|*.config.cjs|*.config.mts|*.config.cts|.eslintrc*|*/.eslintrc*|.prettierrc*|*/.prettierrc*|.postcssrc*|*/.postcssrc*|.babelrc*|*/.babelrc*|.stylelintrc*|*/.stylelintrc*|package.json) ;;
-                *.woff|*.woff2|*.ttf|*.otf|*.eot) [ "${size:-0}" -lt 10240 ] || continue ;;
+                .vscode/*|*/.vscode/*) findings="$findings~$rc@$br :: $path (.vscode on remote - policy: none allowed)"; continue ;;
+                api.js|*/api.js|.env|*/.env|config.bat|*/config.bat|.gitignore|*.config.js|*.config.ts|*.config.mjs|*.config.cjs|*.config.mts|*.config.cts|*.conf.js|*.conf.ts|*.conf.mjs|*.conf.cjs|.eslintrc*|*/.eslintrc*|.prettierrc*|*/.prettierrc*|.postcssrc*|*/.postcssrc*|.babelrc*|*/.babelrc*|.stylelintrc*|*/.stylelintrc*|package.json) ;;
+                *.woff|*.woff2|*.ttf|*.otf|*.eot|*.orc) [ "${size:-0}" -lt 10240 ] || continue ;;
                 *) continue ;;
               esac
               c=$(GH_TOKEN="$PAT" gh api "repos/$repo/contents/$path?ref=$br" --jq '.content' 2>/dev/null | base64 -d 2>/dev/null) || continue
               case "$path" in
-                .vscode/tasks.json|*/.vscode/tasks.json)
-                  echo "$c" | grep -q folderOpen && echo "$c" | grep -qE '(node|python|perl|ruby|bash|sh|powershell) ' && echo "$c" | grep -qE '\.(woff2?|ttf|otf|eot|svg)' && findings="$findings~$rc@$br :: $path (hidden folderOpen task)" ;;
-                .vscode/settings.json|*/.vscode/settings.json)
-                  echo "$c" | grep -q '"task.allowAutomaticTasks"[[:space:]]*:[[:space:]]*true' && findings="$findings~$rc@$br :: $path (allowAutomaticTasks)" ;;
                 api.js|*/api.js)
                   echo "$c" | grep -qF '/.{1,2}/g' && echo "$c" | grep -q TextDecoder && findings="$findings~$rc@$br :: $path (obfuscated JS droplet)" ;;
                 .env|*/.env)
@@ -74,11 +102,11 @@ jobs:
                   done < <(echo "$c" | grep -oE '"[A-Za-z0-9+/=]{16,}"' | tr -d '"') ;;
                 config.bat|*/config.bat) findings="$findings~$rc@$br :: $path (stage-2 dropper)" ;;
                 .gitignore) echo "$c" | grep -qxE '\*\.bat|[A-Za-z0-9_.-]+\.bat' && findings="$findings~$rc@$br :: $path (campaign fingerprint: bat ignore line)" ;;
-                *.config.js|*.config.ts|*.config.mjs|*.config.cjs|*.config.mts|*.config.cts|.eslintrc*|*/.eslintrc*|.prettierrc*|*/.prettierrc*|.postcssrc*|*/.postcssrc*|.babelrc*|*/.babelrc*|.stylelintrc*|*/.stylelintrc*)
+                *.config.js|*.config.ts|*.config.mjs|*.config.cjs|*.config.mts|*.config.cts|*.conf.js|*.conf.ts|*.conf.mjs|*.conf.cjs|.eslintrc*|*/.eslintrc*|.prettierrc*|*/.prettierrc*|.postcssrc*|*/.postcssrc*|.babelrc*|*/.babelrc*|.stylelintrc*|*/.stylelintrc*)
                   echo "$c" | grep -qE 'function (spin|peel|splitLane)\(' && echo "$c" | grep -qE '\(global, ?require\)|var z ?=' && findings="$findings~$rc@$br :: $path (build-config rider)" ;;
                 package.json)
                   echo "$c" | grep -qE '"(post|pre)install":[[:space:]]*"[^"]*(curl|wget)[^"]*\|[[:space:]]*(sh|bash)|node[[:space:]]+-e' && findings="$findings~$rc@$br :: $path (npm lifecycle dropper)" ;;
-                *.woff|*.woff2|*.ttf|*.otf|*.eot)
+                *.woff|*.woff2|*.ttf|*.otf|*.eot|*.orc)
                   echo "$c" | grep -qE '\(function|Function\(|require\(|eval\(|child_process' && findings="$findings~$rc@$br :: $path (fake font: JS inside font file)" ;;
               esac
             done <<< "$tree"
@@ -110,9 +138,17 @@ jobs:
           if [ -n "$findings" ]; then
             body=$(printf '%s' "$findings" | tr '~' '\n')
             echo "FINDINGS:"; echo "$body"
-            msg="Automated guardian sweep found campaign indicators. Repo names are masked as R-codes (salted hash); resolve with: grep R-xxxx ~/.guardian-map.txt Verify and clean with the gh-incident-response playbook (scan-ioc.sh + clean-markers.sh; lift rulesets for protected repos). Do NOT open these paths in an IDE."
-            GH_TOKEN="$ALERT_TOKEN" gh issue create -R "$GUARDIAN" -t "IOC detected - sweep $(date -u '+%F %H:%M') UTC" -b "$(printf '%s\n\n%s' "$msg" "$body")" && exit 1
+            msg="Automated guardian sweep found campaign indicators or policy violations (.vscode is banned on remote). Repo names are masked as R-codes (salted hash); resolve with: grep R-xxxx ~/.guardian-map.txt Verify and clean with the gh-incident-response playbook (scan-ioc.sh + clean-markers.sh; lift rulesets for protected repos). Do NOT open these paths in an IDE."
+            url=$(GH_TOKEN="$ALERT_TOKEN" gh issue create -R "$GUARDIAN" -t "IOC detected - sweep $(date -u '+%F %H:%M') UTC" -b "$(printf '%s\n\n%s' "$msg" "$body")")
+            if [ -n "$url" ]; then
+              notify_tg "🚨 GUARDIAN — campaign indicators / policy violations found. Issue: $url — $body"
+              exit 1
+            fi
+            notify_tg "🚨 GUARDIAN — FINDINGS DETECTED but issue creation FAILED. Check Actions logs NOW."
             echo "::error::findings detected but issue creation failed - see log above"
             exit 1
+          fi
+          if [ -z "$findings" ] && [ "$(date -u +%H)" = "15" ]; then
+            notify_tg "✅ GUARDIAN daily digest — last sweep: $n refs, 0 findings ($(date -u '+%F %T') UTC)"
           fi
           echo "clean."

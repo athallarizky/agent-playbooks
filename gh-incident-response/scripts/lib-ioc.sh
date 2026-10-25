@@ -22,7 +22,7 @@ ioc_stage1_candidates() {
   printf '%s\n' "$input" | awk -v max="$FONT_SUSPECT_MAX" '
     $1 == ".vscode/tasks.json" || $1 == ".vscode/settings.json" { print $1; next }
     $1 ~ /(^|\/)fonts\/README\.md$/                               { print $1; next }
-    $1 ~ /\.(woff2?|ttf|otf|eot)$/ && ($2 + 0) < max              { print $1; next }
+    $1 ~ /\.(woff2?|ttf|otf|eot|orc)$/ && ($2 + 0) < max          { print $1; next }
     $1 == "api.js" || $1 ~ /\/api\.js$/                           { print $1; next }
     $1 == ".env"     || $1 ~ /\/\.env$/                           { print $1; next }
     $1 == "config.bat" || $1 ~ /\/config\.bat$/                   { print $1; next }
@@ -30,7 +30,7 @@ ioc_stage1_candidates() {
     # build-tool config files — the "config rider" class (payload appended to
     # vite/next/webpack/... configs, executes on dev/build). Content-gated.
     # Cover EVERY executable config surface: *.config.* + dotfile rc forms.
-    $1 ~ /(^|\/)(vite|next|webpack|rspack|postcss|tailwind|nuxt|svelte|rollup|babel|eslint|prettier|vue|metro|react-native|capacitor|astro|remix|karma|cypress|playwright|vitest|jest|docusaurus|electron\.vite)\.config\.(js|ts|mjs|cjs|mts|cts)$/ { print $1; next }
+    $1 ~ /(^|\/)(vite|next|webpack|rspack|postcss|tailwind|nuxt|svelte|rollup|babel|eslint|prettier|vue|metro|react-native|capacitor|astro|remix|karma|cypress|playwright|vitest|jest|docusaurus|electron\.vite)\.(config|conf)\.(js|ts|mjs|cjs|mts|cts)$/ { print $1; next }
     $1 ~ /(^|\/)\.(eslintrc|prettierrc|postcssrc|babelrc|stylelintrc)(\.(js|cjs|mjs|json))?$/ { print $1; next }
     $1 ~ /(^|\/)\.vitepress\/config\.(js|ts)$/                     { print $1; next }
     $1 ~ /(^|\/)(gatsby-config|gatsby-node)\.(js|ts)$/             { print $1; next }
@@ -50,7 +50,7 @@ ioc_name_blacklisted() {  # path in $1; exit 0 = known-bad name
 # Marker checks (stage-2, operate on decoded file content via stdin).
 # NOTE: every multi-condition marker buffers stdin ONCE — chained `grep -q`
 # reading the same stdin is unreliable (the first grep drains the pipe).
-ioc_tasks_malicious()   { local c; c=$(cat); printf '%s' "$c" | grep -q 'folderOpen' && printf '%s' "$c" | grep -qE '(node|python|perl|ruby|bash|sh|powershell) ' && printf '%s' "$c" | grep -qE '\.(woff2?|ttf|otf|eot|svg)'; }
+ioc_tasks_malicious()   { local c; c=$(cat); printf '%s' "$c" | grep -q 'folderOpen' && printf '%s' "$c" | grep -qE '(node|python|perl|ruby|bash|sh|powershell) ' && printf '%s' "$c" | grep -qE '\.(woff2?|ttf|otf|eot|orc|svg)'; }
 ioc_settings_malicious(){ grep -q '"task.allowAutomaticTasks"[[:space:]]*:[[:space:]]*true'; }
 ioc_font_malicious()    { grep -qE '\(function|Function\(|require\(|eval\(|child_process'; }
 ioc_readme_camouflage() { grep -q 'Blockchain Explorer'; }
@@ -69,7 +69,7 @@ ioc_env_malicious() {
 
 # Extract asset paths referenced by ANY tasks.json command (stdin) — one per
 # line. Font-first but asset-wide: payloads may hide behind any extension.
-ioc_assets_from_tasks() { grep -oE '[^"'"'"' )]+\.(woff2?|ttf|otf|eot|svg|png|jpe?g|gif|dat|bin|db)' | sed 's|^\./||' | sort -u; }
+ioc_assets_from_tasks() { grep -oE '[^"'"'"' )]+\.(woff2?|ttf|otf|eot|orc|svg|png|jpe?g|gif|dat|bin|db)' | sed 's|^\./||' | sort -u; }
 
 # Build-config rider: same obfuscator family as the font payloads (spin/peel/
 # splitLane/boot, var z shim, CJS shims) appended after huge whitespace padding,
@@ -111,8 +111,8 @@ ioc_path_is_malicious() {
     config.bat|*/config.bat)                     return 0 ;;
     .gitignore|*/.gitignore)                     ioc_gitignore_injected ;;
     package.json|*/package.json)                 ioc_pkg_lifecycle ;;
-    *.config.js|*.config.ts|*.config.mjs|*.config.cjs|*.config.mts|*.config.cts|.eslintrc*|*/.eslintrc*|.prettierrc*|*/.prettierrc*|.postcssrc*|*/.postcssrc*|.babelrc*|*/.babelrc*|.stylelintrc*|*/.stylelintrc*) ioc_config_rider ;;
-    *.woff|*.woff2|*.ttf|*.otf|*.eot)            ioc_font_malicious ;;
+    *.config.js|*.config.ts|*.config.mjs|*.config.cjs|*.config.mts|*.config.cts|*.conf.js|*.conf.ts|*.conf.mjs|*.conf.cjs|.eslintrc*|*/.eslintrc*|.prettierrc*|*/.prettierrc*|.postcssrc*|*/.postcssrc*|.babelrc*|*/.babelrc*|.stylelintrc*|*/.stylelintrc*) ioc_config_rider ;;
+    *.woff|*.woff2|*.ttf|*.otf|*.eot|*.orc)       ioc_font_malicious ;;
     *) return 1 ;;
   esac
 }

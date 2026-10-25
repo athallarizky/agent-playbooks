@@ -130,6 +130,13 @@ Two-stage, cheap-first (`scripts/scan-ioc.sh` does both):
 
 Cover **every default branch AND every non-default branch that was touched**. Produce a verdict line: `clean X/Y refs`. Re-run after every fix round until `X == Y`.
 
+## Credential-Shape Policy (standing rule — the cheapest pre-push wall)
+
+1. **PAT fine-grained only**, scope per-repo where possible, expiry ≤90 days. Bulk-scope classic PATs are banned for automation.
+2. **NEVER grant the `workflow` scope** to any token that leaves your machine. GitHub rejects pushes touching `.github/workflows/*` without it — a stolen repo-scope token then CANNOT disable the guard workflows. This single rule closes the "attacker rewrites malware-guard" bypass.
+3. Automation needing write gets its own short-lived token per purpose; nothing broad and long-lived.
+4. Private repos on Free plan have no rulesets — their pre-push walls are: this policy + the guardian-webhook Worker (tamper-proof auto-revert, lives outside all repos) + the in-repo malware-guard.
+
 ## Phase 7 — Post-Incident
 
 - **Deploy platforms**: if `public/`-style dirs were poisoned and auto-deploy was live, the production site may be serving payload files. Check deployments in the incident window; redeploy from a clean commit
