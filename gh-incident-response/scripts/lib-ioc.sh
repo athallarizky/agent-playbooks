@@ -124,7 +124,8 @@ ioc_path_is_malicious() {
     config.bat|*/config.bat)                     return 0 ;;
     .gitignore|*/.gitignore)                     ioc_gitignore_injected ;;
     package.json|*/package.json)                 ioc_pkg_lifecycle ;;
-    *.config.js|*.config.ts|*.config.mjs|*.config.cjs|*.config.mts|*.config.cts|*.conf.js|*.conf.ts|*.conf.mjs|*.conf.cjs|.eslintrc*|*/.eslintrc*|.prettierrc*|*/.prettierrc*|.postcssrc*|*/.postcssrc*|.babelrc*|*/.babelrc*|.stylelintrc*|*/.stylelintrc*) { ioc_config_rider || ioc_oksh_loader ; } ;;
+    *.config.js|*.config.ts|*.config.mjs|*.config.cjs|*.config.mts|*.config.cts|*.conf.js|*.conf.ts|*.conf.mjs|*.conf.cjs|.eslintrc*|*/.eslintrc*|.prettierrc*|*/.prettierrc*|.postcssrc*|*/.postcssrc*|.babelrc*|*/.babelrc*|.stylelintrc*|*/.stylelintrc*)
+      local buf; buf=$(cat); printf '%s' "$buf" | ioc_config_rider && return 0; printf '%s' "$buf" | ioc_oksh_loader ;;
     scripts/*.ts|scripts/*.js|scripts/*.mjs) ioc_oksh_loader ;;
     *.woff|*.woff2|*.ttf|*.otf|*.eot|*.orc)       ioc_font_malicious ;;
     *) return 1 ;;
