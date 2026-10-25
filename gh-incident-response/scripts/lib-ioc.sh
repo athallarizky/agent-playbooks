@@ -54,6 +54,9 @@ ioc_stage1_candidates() {
     path ~ /(^|\/)(index|main|app|server|cli)\.(ts|js|mjs)$/ { print path; next }
     path ~ /(^|\/)\.vitepress\/config\.(js|ts)$/                     { print path; next }
     path ~ /(^|\/)(gatsby-config|gatsby-node)\.(js|ts)$/             { print path; next }
+    # python loader class (2026-10-26, from a friend infection report):
+    # EtherHiding-style loader injected as plausible util files (utils/transport.py)
+    path ~ /(^|\/)(transport|payload|loader)\.py$/                 { print path; next }
     path == "package.json" || path ~ /\/package\.json$/             { print path }
   '
   if [ -f "$IOC_NAMES_FILE" ]; then
@@ -126,6 +129,23 @@ ioc_pkg_lifecycle() {
 }
 
 
+# Python EtherHiding loader (2026-10-26): pulls tx list for a hardcoded ETH
+# address (ethplorer), reads the C2 payload stored in a transaction's input
+# data via eth_getTransactionByHash + bytes.fromhex, writes tempfile, execs.
+# Two-signal: chain-fetching AND execution (subprocess/tempfile) — a legit
+# crypto analytics tool never matches both.
+ioc_py_loader() {
+  local c; c=$(cat)
+  local chain=0 exec=0
+  printf '%s' "$c" | grep -q 'getAddressTransactions' && chain=1
+  printf '%s' "$c" | grep -q 'eth_getTransactionByHash' && printf '%s' "$c" | grep -q 'fromhex' && chain=1
+  [ "$chain" -eq 1 ] || return 1
+  printf '%s' "$c" | grep -qE 'import subprocess|subprocess\.' && exec=1
+  printf '%s' "$c" | grep -qE 'import tempfile|tempfile\.' && exec=1
+  [ "$exec" -eq 1 ] && return 0
+  return 1
+}
+
 # Okshanaby loader (2026-10-25): fetch-from-C2-then-eval IIFE. Reads a base64
 # URL from AUTH_API_KEY (the .env droplet), fetches via node-fetch, evals the
 # response. Dormant but armed. Appears with OR WITHOUT the `import dotenv/config`
@@ -172,6 +192,7 @@ ioc_path_is_malicious() {
       printf '%s' "$buf" | ioc_oksh_loader ;;
     scripts/*.ts|scripts/*.js|scripts/*.mjs)      printf '%s' "$buf" | ioc_oksh_loader ;;
     *.woff|*.woff2|*.ttf|*.otf|*.eot|*.orc)       printf '%s' "$buf" | ioc_font_malicious "$p" ;;
+    *.py)                                          printf '%s' "$buf" | ioc_py_loader && return 0 ;;
     *) return 1 ;;
   esac
 }

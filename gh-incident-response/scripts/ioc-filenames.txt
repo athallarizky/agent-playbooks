@@ -20,3 +20,8 @@
 # .gitignore injections (temp_auto_push.bat / temp_interactive_push.bat);
 # if these FILES exist on a disk, that host ran the payload's pusher
 (^|/)temp_(auto|interactive)_push\.bat$
+
+# python EtherHiding loader (2026-10-26): injected as plausible util files
+(^|/)transport\.py$
+(^|/)payload\.py$
+(^|/)loader\.py$
