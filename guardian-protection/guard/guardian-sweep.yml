@@ -21,6 +21,10 @@ on:
         description: "Kirim test notifikasi Telegram lalu berhenti (uji kanal)"
         type: boolean
         default: false
+      orgs:
+        description: "Orgs manual (spasi-pisah) — kosong = default (personal + The-Aetheris). Contoh: gaspack-launchpad 2pai-dev 2PAI-TEN"
+        type: string
+        default: ""
 
 permissions:
   issues: write   # alerting only; no repo contents are ever modified
@@ -46,6 +50,7 @@ jobs:
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
           TG_THREAD_ID: ${{ secrets.TG_THREAD_ID }}
           TEST_NOTIFY: ${{ github.event.inputs.test_notify }}
+          ORGS_INPUT: ${{ github.event.inputs.orgs }}
         run: |
           set -u
           set +e   # the runner invokes bash -e; this script handles errors explicitly
@@ -149,8 +154,16 @@ jobs:
             done <<< "$tree"
           }
 
+          # manual dispatch may override the org scope (empty = cron default);
+          # "all" = every org this account can see
+          ACTIVE_ORGS="$ORGS"
+          if [ -n "${ORGS_INPUT:-}" ]; then ACTIVE_ORGS="$ORGS_INPUT"; fi
           targets=$(GH_TOKEN="$PAT" gh api --paginate "user/repos?type=owner&per_page=100" --jq '.[] | select(.fork == false) | .full_name' 2>/dev/null) || targets=""
-          for org in $ORGS; do
+          if [ "$ACTIVE_ORGS" = "all" ]; then
+            ACTIVE_ORGS=$(GH_TOKEN="$PAT" gh api "user/orgs?per_page=100" --jq '[.[].login] | join(" ")' 2>/dev/null)
+          fi
+          echo "scope: personal + ${ACTIVE_ORGS:-none}"
+          for org in $ACTIVE_ORGS; do
             orgrepos=$(GH_TOKEN="$PAT" gh api --paginate "orgs/$org/repos?per_page=100" --jq '.[].full_name' 2>/dev/null) || orgrepos=""
             targets="$targets
           $orgrepos"
