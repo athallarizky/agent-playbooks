@@ -40,6 +40,16 @@ jobs:
   sweep:
     runs-on: ubuntu-latest
     steps:
+      # differential scanning: remember branch→tip-SHA verdicts between runs so
+      # an unchanged ref costs ZERO content fetches. Without this, one sweep
+      # burns its whole 5k/hr token budget on candidate fetches (every index.js
+      # in every React component folder is a candidate) and dies mid-run.
+      - uses: actions/cache@v4
+        with:
+          path: /tmp/sweep-manifest.tsv
+          key: sweep-manifest-${{ github.run_id }}
+          restore-keys: sweep-manifest-
+
       - name: Sweep every branch of every repo for campaign IOCs
         env:
           PAT: ${{ secrets.GUARD_PAT }}
@@ -101,6 +111,10 @@ jobs:
             fi
             while IFS=$'\t' read -r size path; do
               [ -z "${path:-}" ] && continue
+              # >=1MB candidates can't be fetched via the contents API anyway
+              # (content comes back null) — the call is pure waste; real configs
+              # and loaders are never this big, real fonts this big are genuine
+              [ "${size:-0}" -ge 1048576 ] && continue
               case "$path" in
                 .vscode/*|*/.vscode/*) fadd "$path (.vscode on remote - policy: none allowed)"; continue ;;
                 *public/fonts/*|*public/font/*) fadd "$path (planted public/fonts dir - policy: none allowed)"; continue ;;
@@ -190,14 +204,26 @@ jobs:
             exit 1
           fi
 
-          n=0
+          n=0; skipped=0
+          MAN=/tmp/sweep-manifest.tsv
+          touch "$MAN"
+          man_get() { awk -v r="$1" -v b="$2" '$1==r && $2==b {print $3}' "$MAN" | tail -1; }
+          man_set() {  # repo branch sha — upsert
+            grep -v "^$1	$2	" "$MAN" > "$MAN.t" 2>/dev/null; mv "$MAN.t" "$MAN"
+            printf '%s\t%s\t%s\n' "$1" "$2" "$3" >> "$MAN"
+          }
           while read -r repo; do
             [ -z "$repo" ] && continue
-            while read -r br; do
+            while IFS=$'\t' read -r br tip; do
               [ -z "$br" ] && continue
+              prev=$(man_get "$repo" "$br")
+              if [ -n "$prev" ] && [ "$prev" = "$tip" ]; then
+                skipped=$((skipped+1)); continue      # unchanged since last verdict
+              fi
               scan_ref "$repo" "$br"
+              man_set "$repo" "$br" "$tip"
               n=$((n+1))
-            done < <(GH_TOKEN="$PAT" gh api "repos/$repo/branches?per_page=100" --jq '.[].name' 2>/dev/null)
+            done < <(GH_TOKEN="$PAT" gh api "repos/$repo/branches?per_page=100" --jq '.[] | "\(.name)\t\(.commit.sha)"' 2>/dev/null)
           done <<< "$targets"
 
           echo "swept $n refs at $(date -u '+%F %T') UTC"
