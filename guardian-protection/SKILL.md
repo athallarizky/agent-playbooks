@@ -15,10 +15,48 @@ The user will say things like:
 | Layer | Tool | Where it lives |
 |---|---|---|
 | Branch ruleset `malware-guard` (signatures, no force-push, no delete) | `scripts/protect-repos.sh` | GitHub, outside repo content |
-| In-repo guard workflow (private repos where rulesets need a paid plan) | `scripts/deploy-guard.sh` + `guard/malware-guard.yml` | `.github/workflows/` of the target repo |
-| Hourly watchdog sweep (IOC + `.vscode` policy + SCAN-ERROR) | `guard/guardian-sweep.yml` template; live copy in the guardian repo | Outside victim repos by design |
+| In-repo guard workflow (private repos where rulesets need a paid plan) — paths-gated (routine pushes start NO runner), auto-revert via ref API with ephemeral `GITHUB_TOKEN` | `scripts/deploy-guard.sh` + `guard/malware-guard.yml` | `.github/workflows/` of the target repo |
+| Push-latency detection — `guardian-webhook` Worker: read-only, HMAC, full-tree scan on force-pushes, SCAN-ERROR fail-loud, alert-only (revert delegated to the guard) | repo webhooks + org webhook; `~/development/personal/guardian-webhook` | Outside all repos by design |
+| 30-min watchdog sweep (IOC + `.vscode` policy + SCAN-ERROR, manifest-diff scanning) | `guard/guardian-sweep.yml` template; live copy in the guardian repo | Outside victim repos by design |
+| Scheduler heartbeat — `guardian-dispatcher` Worker (dispatches a sweep when the last run is >40 min stale) | `~/development/personal/guardian-dispatcher` | Outside |
+| Webhook registration (per-repo + org-level) | `scripts/register-webhooks.sh` | GitHub repo/org settings, outside repo content |
 | R-code map (resolve masked repo names in alerts) | `scripts/guardian-map.sh` + `~/.guardian-map.txt` | Local, derived — never synced |
 | Ruleset lift (temporarily disable for incident ref surgery) | `scripts/ruleset-lift.sh` | — |
+
+### System diagram (canonical)
+
+```
+PUSH ke repo mana pun ──┬──► [1] guardian-webhook · Cloudflare Worker
+(semua branch)          │         DI LUAR repo · read-only · HMAC · ±2 detik
+                        │           ├── push bersih ────────────────────►  diam (nol biaya)
+                        │           ├── IOC / force-push ──► FULL-TREE    ►  🚨 alert TG
+                        │           │   scan (blind-spot lama tertutup)      (nama repo + pre-push tip)
+                        │           └── fetch gagal ──────────────────────►  ⚠️ SCAN-ERROR —
+                        │                                                  verdict ditahan,
+                        │                                                  tak pernah false-clean
+                        │
+                        └──► [2] malware-guard.yml · in-repo (2 repo private)
+                                  ephemeral GITHUB_TOKEN (tak bisa dicuri)
+                                  ├── push tak sentuh path kandidat ─────►  TANPA runner (0 menit)
+                                  └── IOC ──► scan ──► AUTO-REVERT
+                                              via API PATCH ref —
+                                              tahan force-push rewrite   │
+                                                                          │
+                                 revert push (forced) ◄──────────────────┘
+                                   │
+                                   └──► kembali ke [1] → tree sudah bersih → diam
+                                        (tanpa loop alert)
+
+                         rewrite ke history pra-guard? [2] tak jalan di sana
+                         — [1] jadi satu-satunya detektor → alert-only, revert manual/runbook
+
+JARING PENGAMAN (jalur lambat, tak bisa dimatikan dari repo korban):
+     [3] guardian-sweep · tiap 30 mnt · semua repo+branch (read-only, manifest diff)
+     [4] dispatcher    · Worker tiap 20 mnt · sweep macet >40 mnt → dispatch manual
+
+DOKTRIN: deteksi hidup di luar blast radius · revert hanya oleh token ephemeral
+         · tidak ada token write standing di mana pun · diam = harus benar-benar diam
+```
 
 **New repo? One command:** `scripts/onboard-repo.sh <owner/repo>` — ruleset, private-repo fallback, map refresh, summary.
 
